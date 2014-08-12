@@ -2,9 +2,10 @@
 DAAP server/proxy for SubSonic: play your favorite tunes from SubSonic in
 iTunes!
 
-This project is an early alpha and hasn't been tested systems other than OSX.
+This project is an early and experiomental version. It hasn't been tested on
+systems other than OSX.
 
-## Featuers
+## Features
 * Compatible with SubSonic 4.9+ and iTunes 11+, including password protection and Bonjour
 * Artwork support
 * Playlist support
@@ -13,7 +14,7 @@ This project is an early alpha and hasn't been tested systems other than OSX.
 * Revision support: efficient library updates pushed to all connected clients
 
 ## Requirements
-* Python 2.7+. PyPy 2.3 works and is a lot faster, but has some issues with Bonjour
+* Python 2.7+. PyPy 2.3 works and is a lot faster, but has some issues with Bonjour.
 * Database provider. SQLite works, but has some issues. MySQL is fine
 
 ## Installation
