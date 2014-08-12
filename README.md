@@ -2,6 +2,10 @@
 DAAP server/proxy for SubSonic: play your favorite tunes from SubSonic in
 iTunes!
 
+The motivation for this application comes from the fact that SubSonic does not
+ship a DAAP server, and OS X clients for SubSonic lack features, in my opinion.
+And after all, iTunes is a pretty intuitive and stable player.
+
 This project is an early and experiomental version. It hasn't been tested on
 systems other than OSX.
 
@@ -18,6 +22,10 @@ systems other than OSX.
 * Database provider. SQLite works, but has some issues. MySQL is fine
 
 ## Installation
+This application was designed as a gateway between SubSonic and iTunes.
+Therefore, it's recommended to install this on the same system where you would
+access iTunes on. It can be installed on a central server, however.
+
 * Clone this repository
 * Install dependencies:
   * `pip install git+https://github.com/crustymonkey/py-sonic.git`
