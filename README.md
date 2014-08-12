@@ -14,6 +14,7 @@ systems other than OSX.
 * Artwork support
 * Playlist support
 * Browse the whole library in iTunes
+* Supports gapless playback
 * Smart file caching: supports in-file searching and concurrent access.
 * Revision support: efficient library updates pushed to all connected clients
 
