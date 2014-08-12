@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import logging
 import gevent
+import time
 import mmap
 import os
 
@@ -76,9 +77,10 @@ class FileCache(object):
             utils.human_bytes(self.current_size),
             utils.human_bytes(self.max_size))
 
+        # Spawn task to prune cache and expire items.
         def _task():
             while True:
-                gevent.sleep(60)
+                gevent.sleep(60 * 5)
 
                 self.prune()
                 self.expire()
@@ -235,12 +237,12 @@ class ArtworkCache(FileCache):
     def load_from_disk(self, item, cache_file, cache_key, cache_item):
         def on_start():
             cache_item.uses += 1
-            logger.debug("%s: incremented '%s' to %d", self.name, cache_key,
+            logger.debug("%s: incremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         def on_finish():
             cache_item.uses -= 1
-            logger.debug("%s: decremented '%s' to %d", self.name, cache_key,
+            logger.debug("%s: decremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         file_size = os.stat(cache_file).st_size
@@ -257,10 +259,13 @@ class ArtworkCache(FileCache):
 
     def load_from_remote(self, item, cache_file, cache_key, cache_item):
         def on_cache():
-            remote_fd.close()
+            logger.debug("%s: loading '%s' from remote took %.2f seconds.",
+                self.name, cache_key, time.time() - start)
 
+            remote_fd.close()
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
+        start = time.time()
         remote_fd = self.connection.getCoverArt(item.id)
 
         cache_item.iterator = stream.stream_from_remote(cache_item.lock,
@@ -280,12 +285,12 @@ class ItemCache(FileCache):
     def load_from_disk(self, item, cache_file, cache_key, cache_item):
         def on_start():
             cache_item.uses += 1
-            logger.debug("%s: incremented '%s' to %d", self.name, cache_key,
+            logger.debug("%s: incremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         def on_finish():
             cache_item.uses -= 1
-            logger.debug("%s: decremented '%s' to %d", self.name, cache_key,
+            logger.debug("%s: decremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         file_size = os.stat(cache_file).st_size
@@ -306,10 +311,13 @@ class ItemCache(FileCache):
 
     def load_from_remote(self, item, cache_file, cache_key, cache_item):
         def on_cache():
-            remote_fd.close()
+            logger.debug("%s: loading '%s' from remote took %.2f seconds.",
+                self.name, cache_key, time.time() - start)
 
+            remote_fd.close()
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
+        start = time.time()
         remote_fd = self.connection.download(item.id - 1)
 
         cache_item.type = item.file_type
