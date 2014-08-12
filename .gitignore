@@ -1,7 +1,8 @@
 # Project files
 data/
-config.ini
-database.db
+*.ini
+*.db
+*.pid
 
 # Development files
 *.pyc
