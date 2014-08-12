@@ -36,6 +36,7 @@ access iTunes on. It can be installed on a central server, however.
   * `pip install flask`
 * Copy `config.ini.default` to `config.ini`
   * Don't forget to change the database settings!
+* `chmod 700 config.ini`, so others cannot view your credentials!
 
 ## Run the application
 To run the application, use the following command, or similar:
