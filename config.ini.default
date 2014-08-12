@@ -19,7 +19,7 @@ password = TODO
 [Daap]
 
 # The name of the server.
-name = SubSonic van Bas
+name = SubSonic Library
 
 # Bind to specific interface (default is 127.0.0.1).
 # interface = 192.168.1.100
