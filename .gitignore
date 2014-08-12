@@ -1,0 +1,9 @@
+# Project files
+data/
+config.ini
+database.db
+
+# Development files
+*.pyc
+*.pyo
+*.so
