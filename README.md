@@ -30,10 +30,12 @@ access iTunes on. It can be installed on a central server, however.
 * Install dependencies:
   * `pip install git+https://github.com/crustymonkey/py-sonic.git`
   * `pip install git+https://github.com/basilfx/flask-daapserver.git`
-  * `pip install git+https://github.com/depl0y/pybonjour-python3`
-  * `pip install gevent`
-  * `pip install sqlalchemy`
+  * `pip install git+https://github.com/basilfx/pybonjour-python3`
+  * `pip install gevent` (for Pypy: `pip install git+https://github.com/surfly/gevent`)
   * `pip install flask`
+  * `pip install sqlalchemy`
+  * `pip install configobj`
+  * `pip install mysql-python` (for MySQL support)
 * Copy `config.ini.default` to `config.ini`
   * Don't forget to change the database settings!
 * `chmod 700 config.ini`, so others cannot view your credentials!
@@ -50,6 +52,7 @@ more verbose.
 
 ## Known issues
 * SQLite doesn't work when application runs as daemon.
+* Titles, artists and/or albums may have HTML entities in them. This is due to a bug in libsonic.
 
 ## License
 See the `LICENSE` file (MIT license).
