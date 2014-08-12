@@ -7,8 +7,7 @@ from validate import Validator
 CONFIG_SPEC = \
 """
 [SubSonic]
-host = string
-port = integer(min=0, max=65535, default=80)
+url = string
 username = string
 password = string
 

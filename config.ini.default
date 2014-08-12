@@ -3,11 +3,8 @@
 
 [SubSonic]
 
-# Remote server host
-host = TODO
-
-# Remote server port.
-port = 80
+# Remote server host (e.g. http://host:port/)
+url = TODO
 
 # Username
 username = TODO

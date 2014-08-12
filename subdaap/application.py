@@ -1,4 +1,4 @@
-from subdaap import subsonic, config, database, cache
+from subdaap import subsonic, config, database, cache, utils
 
 from gevent.pywsgi import WSGIServer
 from daapserver import zeroconf, create_daap_server
@@ -41,11 +41,11 @@ class Application(object):
         Setup the database connection, the SubSonic connection and provider.
         """
 
+        host, port = utils.parse_subsonic_url(self.config["SubSonic"]["url"])
         db = database.Database(self.config["Provider"]["database connection"])
-        connection = libsonic.Connection(self.config["SubSonic"]["host"],
+        connection = libsonic.Connection(host,
             self.config["SubSonic"]["username"],
-            self.config["SubSonic"]["password"],
-            port=self.config["SubSonic"]["port"])
+            self.config["SubSonic"]["password"], port=port)
 
         artwork_cache_dir = self.get_cache_dir(
             self.config["Provider"]["artwork cache dir"])

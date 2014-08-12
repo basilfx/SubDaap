@@ -1,6 +1,7 @@
+import argparse
+import urlparse
 import zlib
 import uuid
-import argparse
 import os
 
 class VerboseAction(argparse.Action):
@@ -51,6 +52,24 @@ def force_list(value):
         return value
     else:
         return [value]
+
+def parse_subsonic_url(url):
+    parts = urlparse.urlparse(url)
+    scheme = parts.scheme or "http"
+
+    # Make sure there is hostname
+    if not parts.hostname:
+        raise ValueError("Expected hostname for URL: %s" % url)
+
+    # Validate scheme
+    if scheme not in ["http", "https"]:
+        raise ValueError("Unexpected scheme '%s' for URL: %s" % (scheme, url))
+
+    # Pick a default port
+    port = parts.port or {"http": 80, "https": 443}[scheme]
+
+    # Return new URL and the port.
+    return "%s://%s" % (scheme, parts.hostname), port
 
 def human_bytes(num):
     for x in ["bytes","KB","MB","GB"]:
