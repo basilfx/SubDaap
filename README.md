@@ -6,8 +6,9 @@ The motivation for this application comes from the fact that SubSonic does not
 ship a DAAP server, and OS X clients for SubSonic lack features, in my opinion.
 And after all, iTunes is a pretty intuitive and stable player.
 
-This project is an early and experiomental version. It hasn't been tested on
-systems other than OSX.
+This project is an early and experiomental version. I use it for my personal
+library of +/- 25.000 items, which works great and fast enough. It hasn't been
+tested on systems other than OSX.
 
 ## Features
 * Compatible with SubSonic 4.9+ and iTunes 11+, including password protection and Bonjour
@@ -54,6 +55,8 @@ more verbose.
 ## Known issues
 * SQLite doesn't work when application runs as daemon.
 * Titles, artists and/or albums may have HTML entities in them. This is due to a bug in libsonic.
+* Gevent will throw `Broken Pipe' exceptions. This is a known issue, see https://github.com/surfly/gevent/pull/377
+* Not all configuration options are respected (yet)
 
 ## License
 See the `LICENSE` file (MIT license).
