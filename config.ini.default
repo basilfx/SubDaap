@@ -1,0 +1,64 @@
+# Paths and files are relative to the data directory!
+
+
+[SubSonic]
+
+# Remote server host
+host = TODO
+
+# Remote server port.
+port = 80
+
+# Username
+username = TODO
+
+# Password
+password = TODO
+
+
+[Daap]
+
+# The name of the server.
+name = SubSonic van Bas
+
+# Bind to specific interface (default is 127.0.0.1).
+# interface = 192.168.1.100
+
+# Server port (default is 3689, may conflict with iTunes Home Sharing).
+# port = 3688
+
+# Server password (default is no password).
+# password = MyPassword
+
+# To advertise server via Bonjour (default is yes).
+# zeroconf = no
+
+
+[Provider]
+
+# Database connection string. See
+# http://docs.sqlalchemy.org/en/rel_0_9/core/engines.html#database-urls for more
+# information.
+database connection = TODO
+
+# Enable artwork (default is yes).
+# artwork = no
+
+# Cache artwork (default is yes, faster)
+# artwork cache = no
+
+# Path for artwork cache.
+artwork cache dir = ./artwork
+
+# Max size (in MB) before old artwork will be pruned (default is 0, unlimited).
+artwork cache size = 1024
+
+# Cache items (default is yes, faster)
+# item cache = no
+
+# Path for item cache
+item cache dir = ./files
+
+# Max size (in MB) before old files will be pruned (default is 0, unlimited).
+# This does not include the files that are permanently cached.
+item cache size = 10240
