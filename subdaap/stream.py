@@ -62,8 +62,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
         put = False
 
         # Hack (1)
-        owner = lock._owner
-        lock._owner = gevent.getcurrent()
+        old_owner, lock._owner = lock._owner, gevent.getcurrent()
 
         with lock:
             try:
@@ -78,7 +77,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
                 queue.put(StopIteration)
 
         # Hack (2)
-        lock._owner = owner
+        lock._owner = old_owner
 
     def _streamer(byte_range=None):
         begin, end = parse_byte_range(byte_range)

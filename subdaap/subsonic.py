@@ -1,9 +1,8 @@
 from subdaap import cache, utils
 
 from daapserver.provider import Provider
-from daapserver.structures import RevisionManager
 
-from subdaap.provider import Server, Database, VirtualContainer, Container, Item, ContainerItem
+from subdaap.models import Server, Database#, Container, Item, ContainerItem
 from subdaap import database
 
 from gevent import queue

@@ -24,7 +24,7 @@ def parse_arguments():
     parser.add_argument("-D", "--daemon", action="store_true",
         help="run as daemon")
     parser.add_argument("-v", "--verbose", nargs="?", action=VerboseAction,
-        help="toggle verbose mode (-vv, -vvv, etc. for more)")
+        default=0, help="toggle verbose mode (-vv, -vvv, etc. for more)")
     parser.add_argument("-c", "--config-file", action=PathAction,
         default="config.ini", help="config file")
     parser.add_argument("-d", "--data-dir", action=PathAction,
@@ -61,9 +61,7 @@ def daemonize(pid_file=None):
 
     # First fork
     try:
-        pid = os.fork()
-
-        if pid > 0:
+        if os.fork() > 0:
             sys.exit(0)
     except OSError as e:
         sys.stderr.write("Unable to fork: %d (%s)\n" % (e.errno, e.strerror))
@@ -75,9 +73,7 @@ def daemonize(pid_file=None):
 
     # Second fork
     try:
-        pid = os.fork()
-
-        if pid > 0:
+        if os.fork() > 0:
             sys.exit(0)
     except OSError as e:
         sys.stderr.write("Unable to fork: %d (%s)\n" % (e.errno, e.strerror))

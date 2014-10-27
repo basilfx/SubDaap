@@ -1,4 +1,4 @@
-from subdaap import subsonic, config, database, cache, utils
+from subdaap import provider, config, database, cache, utils
 
 from gevent.pywsgi import WSGIServer
 from daapserver import zeroconf, create_daap_server
@@ -57,7 +57,7 @@ class Application(object):
             self.config["Provider"]["item cache size"])
 
         logger.debug("Setup SubSonic provider")
-        self.provider = subsonic.SubSonicProvider(db=db, connection=connection,
+        self.provider = provider.SubSonicProvider(db=db, connection=connection,
             artwork_cache=self.artwork_cache, item_cache=self.item_cache)
 
     def setup_server(self):
