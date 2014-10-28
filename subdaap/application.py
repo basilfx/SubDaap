@@ -1,7 +1,7 @@
 from subdaap import provider, config, database, cache, utils
 
 from gevent.pywsgi import WSGIServer
-from daapserver import zeroconf, create_daap_server
+from daapserver import zeroconf, create_server_app
 
 import libsonic
 import logging
@@ -66,7 +66,7 @@ class Application(object):
         """
 
         bind = self.config["Daap"]["interface"], self.config["Daap"]["port"]
-        application = create_daap_server(self.provider,
+        application = create_server_app(self.provider,
             server_name=self.config["Daap"]["name"],
             password=self.config["Daap"]["password"],
             debug=self.verbose > 1)
