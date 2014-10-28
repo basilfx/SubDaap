@@ -1,9 +1,3 @@
-from sqlalchemy import Column, BigInteger, Integer, String, Boolean, ForeignKey, UniqueConstraint, Table, PickleType
-from sqlalchemy import create_engine, func, inspect, select, join, outerjoin
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import relationship, backref, sessionmaker, scoped_session, column_property
-
 from daapserver import utils
 
 from contextlib import contextmanager
@@ -12,168 +6,16 @@ from gevent import lock, local
 
 import sys
 import gevent
+import sqlite3
 import collections
-
-Base = declarative_base()
-
-class PlaylistItem(Base):
-    __tablename__ = "playlist_item"
-
-    id = Column(Integer, primary_key=True)
-    persistent_id = Column(PickleType, nullable=False, default=utils.generate_persistent_id)
-
-    library_id = Column(Integer, ForeignKey("library.id"))
-    library = relationship("database.Library")
-
-    playlist_id = Column(Integer, ForeignKey("playlist.id"))
-    item_id = Column(Integer, ForeignKey("item.id"))
-
-    item = relationship("database.Item")
-    playlist = relationship("database.Playlist")
-
-    order = Column(Integer)
-
-
-class Item(Base):
-    __tablename__ = "item"
-
-    id = Column(Integer, primary_key=True)
-    persistent_id = Column(PickleType, nullable=False, default=utils.generate_persistent_id)
-
-    library_id = Column(Integer, ForeignKey("library.id"))
-    library = relationship("database.Library")
-
-    artist_id = Column(Integer, ForeignKey("artist.id"))
-    album_id = Column(Integer, ForeignKey("album.id"))
-
-    name = Column(String(255))
-
-    genre = Column(String(255))
-    year = Column(Integer)
-    track = Column(Integer)
-
-    duration = Column(Integer)
-    bitrate = Column(Integer)
-
-    file_name = Column(String(4096))
-    file_type = Column(String(255))
-    file_suffix = Column(String(32))
-    file_size = Column(Integer)
-
-    exclude = Column(Boolean, default=False, nullable=False)
-    cache = Column(Boolean, default=False, nullable=False)
-
-    checksum = Column(Integer, nullable=False)
-
-
-class Artist(Base):
-    __tablename__ = "artist"
-
-    id = Column(Integer, primary_key=True)
-
-    library_id = Column(Integer, ForeignKey("library.id"))
-    library = relationship("database.Library")
-
-    items = relationship("database.Item", backref="artist")
-
-    name = Column(String(255), nullable=False)
-
-    exclude = Column(Boolean, default=False, nullable=False)
-    cache = Column(Boolean, default=False, nullable=False)
-
-    checksum = Column(Integer, default=0, nullable=False)
-
-
-class Album(Base):
-    __tablename__ = "album"
-
-    id = Column(Integer, primary_key=True)
-
-    library_id = Column(Integer, ForeignKey("library.id"))
-    library = relationship("database.Library")
-
-    items = relationship("database.Item", backref="album")
-
-    name = Column(String(255), nullable=False)
-
-    art = Column(Boolean, default=False)
-    art_name = Column(String(4096))
-    art_type = Column(String(255))
-    art_size = Column(Integer)
-
-    exclude = Column(Boolean, default=False, nullable=False)
-    cache = Column(Boolean, default=False, nullable=False)
-
-    checksum = Column(Integer, default=0, nullable=False)
-
-
-class Playlist(Base):
-    __tablename__ = "playlist"
-
-    id = Column(Integer, primary_key=True)
-    persistent_id = Column(PickleType, nullable=False, default=utils.generate_persistent_id)
-
-    library_id = Column(Integer, ForeignKey("library.id"))
-    library = relationship("database.Library")
-
-    name = Column(String(255), nullable=False)
-    is_base = Column(Boolean, default=False, nullable=False)
-
-    exclude = Column(Boolean, default=False, nullable=False)
-    cache = Column(Boolean, default=False, nullable=False)
-
-    checksum = Column(Integer, default=0, nullable=False)
-
-
-class Library(Base):
-    __tablename__ = "library"
-
-    id = Column(Integer, primary_key=True)
-    persistent_id = Column(PickleType, nullable=False, default=utils.generate_persistent_id)
-
-    name = Column(String(255), nullable=False)
-
-    items_version = Column(BigInteger, default=0, nullable=False)
-    playlists_version = Column(BigInteger, default=0, nullable=False)
-
-
-database_table = select([
-    getattr(Library, field) for field in Library.__table__.c.keys() if field not in ["checksum", "persistent_id"]
-])
-
-item_table = select([
-    getattr(Item, field) for field in Item.__table__.c.keys() if field not in ["checksum", "persistent_id"]
-] + [
-    Album.art.label("album_art"),
-    Album.art_name.label("album_art_name"),
-    Album.art_size.label("album_art_size"),
-    Album.art_type.label("album_art_type"),
-    Album.name.label("album"),
-    Artist.name.label("artist")
-]).select_from(
-    outerjoin(
-        Item, Artist, Item.artist_id == Artist.id
-    ).outerjoin(
-        Album, Item.album_id == Album.id
-    )
-)
-
-container_table = select([
-    getattr(Playlist, field) for field in Playlist.__table__.c.keys() if field not in ["checksum", "persistent_id"]
-])
-
-container_item_table = select([
-    getattr(PlaylistItem, field) for field in PlaylistItem.__table__.c.keys() if field not in ["checksum", "persistent_id"]
-])
-
 
 class Database(object):
 
     def __init__(self, connection):
         self.lock = lock.RLock()
 
-        self.engine = create_engine(connection)
-        self.session_class = scoped_session(sessionmaker(bind=self.engine, expire_on_commit=False))
+        self.connection = sqlite3.connect("./database.db")
+        self.connection.row_factory = sqlite3.Row
 
     def get_lock(self):
         return self.lock
@@ -198,8 +40,107 @@ class Database(object):
 
     def create_database(self, drop_all=True):
         with self.lock:
+            # Drop all tables if required
             if drop_all:
-                Base.metadata.drop_all(self.engine)
+                with self.connection:
+                    query = ("""
+                            DROP TABLE IF EXISTS `databases`;
+                            DROP TABLE IF EXISTS `items`;
+                            DROP TABLE IF EXISTS `containers`'
+                            DROP TABLE IF EXISTS `container_items`;
+                            """, )
 
-            # Create tables
-            Base.metadata.create_all(self.engine)
+                    # Execute query
+                    self.connection.executescript(*query)
+
+            # Create table query
+            with self.connection:
+                query = ("""
+                        CREATE TABLE IF NOT EXISTS `databases` (
+                            `id` int(11) NOT NULL,
+                            `persistent_id` blob NOT NULL,
+                            `name` varchar(255) NOT NULL,
+                            PRIMARY KEY (`id`)
+                        );
+                        CREATE TABLE IF NOT EXISTS `artists` (
+                            `id` int(11) NOT NULL,
+                            `database_id` int(11) DEFAULT NULL,
+                            `name` varchar(255) NOT NULL,
+                            `exclude` tinyint(1) NOT NULL,
+                            `cache` tinyint(1) NOT NULL,
+                            `checksum` int(11) NOT NULL,
+                            PRIMARY KEY (`id`),
+                            CONSTRAINT `artist_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                        );
+                        CREATE TABLE IF NOT EXISTS `albums` (
+                            `id` int(11) NOT NULL,
+                            `database_id` int(11) DEFAULT NULL,
+                            `name` varchar(255) NOT NULL,
+                            `art` tinyint(1) DEFAULT NULL,
+                            `art_name` varchar(4096) DEFAULT NULL,
+                            `art_type` varchar(255) DEFAULT NULL,
+                            `art_size` int(11) DEFAULT NULL,
+                            `exclude` tinyint(1) NOT NULL,
+                            `cache` tinyint(1) NOT NULL,
+                            `checksum` int(11) NOT NULL,
+                            PRIMARY KEY (`id`),
+                            CONSTRAINT `album_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                        );
+                        CREATE TABLE IF NOT EXISTS `items` (
+                            `id` int(11) NOT NULL,
+                            `persistent_id` blob NOT NULL,
+                            `database_id` int(11) DEFAULT NULL,
+                            `artist_id` int(11) DEFAULT NULL,
+                            `album_id` int(11) DEFAULT NULL,
+                            `name` varchar(255) DEFAULT NULL,
+                            `genre` varchar(255) DEFAULT NULL,
+                            `year` int(11) DEFAULT NULL,
+                            `track` int(11) DEFAULT NULL,
+                            `duration` int(11) DEFAULT NULL,
+                            `bitrate` int(11) DEFAULT NULL,
+                            `file_name` varchar(4096) DEFAULT NULL,
+                            `file_type` varchar(255) DEFAULT NULL,
+                            `file_suffix` varchar(32) DEFAULT NULL,
+                            `file_size` int(11) DEFAULT NULL,
+                            `exclude` tinyint(1) NOT NULL,
+                            `cache` tinyint(1) NOT NULL,
+                            `checksum` int(11) NOT NULL,
+                            PRIMARY KEY (`id`),
+                            CONSTRAINT `item_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`),
+                            CONSTRAINT `item_fk_2` FOREIGN KEY (`album_id`) REFERENCES `albums` (`id`),
+                            CONSTRAINT `item_fk_3` FOREIGN KEY (`artist_id`) REFERENCES `artists` (`id`)
+                        );
+                        CREATE TABLE IF NOT EXISTS `containers` (
+                            `id` int(11) NOT NULL,
+                            `persistent_id` blob NOT NULL,
+                            `database_id` int(11) DEFAULT NULL,
+                            `name` varchar(255) NOT NULL,
+                            `is_base` int(1) NOT NULL,
+                            `is_smart` int(1) NOT NULL,
+                            `exclude` tinyint(1) NOT NULL,
+                            `cache` tinyint(1) NOT NULL,
+                            `checksum` int(11) NOT NULL,
+                            PRIMARY KEY (`id`),
+                            CONSTRAINT `container_fk` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                        );
+                        CREATE TABLE IF NOT EXISTS `container_items` (
+                            `id` int(11) NOT NULL,
+                            `persistent_id` blob NOT NULL,
+                            `database_id` int(11) DEFAULT NULL,
+                            `container_id` int(11) DEFAULT NULL,
+                            `item_id` int(11) DEFAULT NULL,
+                            `order` int(11) DEFAULT NULL,
+                            PRIMARY KEY (`id`),
+                            CONSTRAINT `container_item_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                            CONSTRAINT `container_item_fk_2` FOREIGN KEY (`container_id`) REFERENCES `containers` (`id`)
+                        );
+                        """, )
+
+                # Execute query
+                self.connection.executescript(*query)
+
+    def query_value(self, *query):
+        return self.connection.execute(*query).fetchone()[0]
+
+    def query_all(self, *query):
+        return self.connection.execute(*query)
