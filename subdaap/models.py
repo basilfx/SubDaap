@@ -19,6 +19,8 @@ class DatabaseCollection(models.Collection):
                         COUNT(*)
                     FROM
                         `databases`
+                    WHERE
+                        `databases`.`exclude` = 0
                     LIMIT 1
                     """, )
         elif self.key == models.KEY_ITEMS:
@@ -27,8 +29,15 @@ class DatabaseCollection(models.Collection):
                         COUNT(*)
                     FROM
                         `items`
+                    LEFT OUTER JOIN
+                        `artists` ON `items`.`artist_id`=`artists`.`id`
+                    LEFT OUTER JOIN
+                        `albums` ON `items`.`album_id`=`albums`.`id`
                     WHERE
-                        `items`.`database_id` = ?
+                        `items`.`database_id` = ? AND
+                        `items`.`exclude` = 0 AND
+                        `artists`.`exclude` = 0 AND
+                        `albums`.`exclude` = 0
                     LIMIT 1
                     """, (self.parent.id, ))
         elif self.key == models.KEY_CONTAINERS:
@@ -38,7 +47,8 @@ class DatabaseCollection(models.Collection):
                     FROM
                         `containers`
                     WHERE
-                        `containers`.`database_id` = ?
+                        `containers`.`database_id` = ? AND
+                        `containers`.`exclude` = 0
                     LIMIT 1
                     """, (self.parent.id, ))
         elif self.key == models.KEY_CONTAINER_ITEMS:
@@ -48,7 +58,8 @@ class DatabaseCollection(models.Collection):
                     FROM
                         `container_items`
                     WHERE
-                        `container_items`.`container_id` = ?
+                        `container_items`.`container_id` = ? AND
+                        `container_items`.`exclude` = 0
                     LIMIT 1
                     """, (self.parent.id, ))
 
@@ -69,6 +80,8 @@ class DatabaseCollection(models.Collection):
                             *
                         FROM
                             `databases`
+                        WHERE
+                            `databases`.`exclude` = 0
                         """, )
             elif self.key == models.KEY_ITEMS:
                 clazz = Item
@@ -88,7 +101,10 @@ class DatabaseCollection(models.Collection):
                         LEFT OUTER JOIN
                             `albums` ON `items`.`album_id`=`albums`.`id`
                         WHERE
-                            `items`.`database_id` = ?
+                            `items`.`database_id` = ? AND
+                            `items`.`exclude` = 0 AND
+                            `artists`.`exclude` = 0 AND
+                            `albums`.`exclude` = 0
                         """, (self.parent.id, ))
             elif self.key == models.KEY_CONTAINERS:
                 clazz = Container
@@ -98,7 +114,8 @@ class DatabaseCollection(models.Collection):
                         FROM
                             `containers`
                         WHERE
-                            `containers`.`database_id` = ?
+                            `containers`.`database_id` = ? AND
+                            `containers`.`exclude` = 0
                         """, (self.parent.id, ))
             elif self.key == models.KEY_CONTAINER_ITEMS:
                 clazz = ContainerItem
@@ -108,7 +125,8 @@ class DatabaseCollection(models.Collection):
                         FROM
                             `container_items`
                         WHERE
-                            `container_items`.`container_id` = ?
+                            `container_items`.`container_id` = ? AND
+                            `container_items`.`exclude` = 0
                         """, (self.parent.id, ))
 
             # Convert rows to items

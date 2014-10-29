@@ -60,6 +60,7 @@ class Database(object):
                             `id` int(11) NOT NULL,
                             `persistent_id` blob NOT NULL,
                             `name` varchar(255) NOT NULL,
+                            `exclude` tinyint(1) NOT NULL,
                             PRIMARY KEY (`id`)
                         );
                         CREATE TABLE IF NOT EXISTS `artists` (
