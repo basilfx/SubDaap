@@ -55,12 +55,14 @@ class Application(object):
             self.config["Provider"]["artwork cache dir"])
         item_cache_dir = self.get_cache_dir(
             self.config["Provider"]["item cache dir"])
-        self.artwork_cache = cache.ArtworkCache(connection, artwork_cache_dir,
+        self.artwork_cache = cache.ArtworkCache(connections, artwork_cache_dir,
             self.config["Provider"]["artwork cache size"])
-        self.item_cache = cache.ItemCache(connection, item_cache_dir,
+        self.item_cache = cache.ItemCache(connections, item_cache_dir,
             self.config["Provider"]["item cache size"])
 
         # Create provider
+        logger.debug("Setting up Provider with %d connections",
+            len(connections))
         self.provider = provider.SubSonicProvider(db=db,
             connections=connections, artwork_cache=self.artwork_cache,
             item_cache=self.item_cache)

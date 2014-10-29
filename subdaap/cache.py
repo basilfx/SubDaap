@@ -33,16 +33,16 @@ class FileCacheItem(object):
         self.permanent = False
 
 class FileCache(object):
-    def __init__(self, connection, directory, max_size=None):
+    def __init__(self, connections, directory, max_size=None):
         """
         Construct a new file cache.
 
-        Remember: max_size is in megabytes!
+        Note: `max_size` is in megabytes!
         """
 
         self.name = self.__class__.__name__
 
-        self.connection = connection
+        self.connections = connections
         self.directory = directory
         self.max_size = max_size * 1024 * 1024
         self.current_size = 0
@@ -270,7 +270,7 @@ class ArtworkCache(FileCache):
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
         start = time.time()
-        remote_fd = self.connection.getCoverArt(item.id)
+        remote_fd = self.connections[item.database_id].getCoverArt(item.id)
 
         cache_item.iterator = stream.stream_from_remote(cache_item.lock,
             remote_fd, cache_file, on_cache=on_cache)
@@ -325,7 +325,7 @@ class ItemCache(FileCache):
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
         start = time.time()
-        remote_fd = self.connection.download(item.id - 1)
+        remote_fd = self.connections[item.database_id].download(item.id - 1)
 
         cache_item.type = item.file_type
         cache_item.size = item.file_size

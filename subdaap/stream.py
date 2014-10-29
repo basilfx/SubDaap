@@ -3,6 +3,7 @@ from daapserver.utils import parse_byte_range
 import os
 import shutil
 import gevent
+import gevent.queue
 
 def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
     on_cache=None):
