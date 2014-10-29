@@ -7,19 +7,22 @@ from validate import Validator
 CONFIG_SPEC = \
 """
 [SubSonic]
+
+[[__many__]]
+index = integer(min=1, default=1)
 url = string
 username = string
 password = string
 
 [Daap]
 name = string
-interface = string(default="127.0.0.1")
+interface = string(default="0.0.0.0")
 port = integer(min=0, max=65535, default=3689)
 password = string(default="")
 zeroconf = boolean(default=True)
 
 [Provider]
-database connection = string
+database = string
 
 artwork = boolean(default=True)
 artwork cache = boolean(default=True)

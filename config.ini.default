@@ -3,6 +3,16 @@
 
 [SubSonic]
 
+# You can define multiple SubSonic libraries here. Each connection will be
+# considered as a separate database. Altough the DAAP protocol supports multiple
+# databases, iTunes only supports one library. The name of the key defines it's
+# name.
+
+[[ My SubSonic Library ]]
+
+# Local database index mapping. Should be unique.
+index = 1
+
 # Remote server host (e.g. http://host:port/)
 url = TODO
 
@@ -16,9 +26,9 @@ password = TODO
 [Daap]
 
 # The name of the server.
-name = SubSonic Library
+name = SubDaap Library
 
-# Bind to specific interface (default is 127.0.0.1).
+# Bind to specific interface (default is 0.0.0.0).
 # interface = 192.168.1.100
 
 # Server port (default is 3689, may conflict with iTunes Home Sharing).
@@ -33,10 +43,8 @@ name = SubSonic Library
 
 [Provider]
 
-# Database connection string. See
-# http://docs.sqlalchemy.org/en/rel_0_9/core/engines.html#database-urls for more
-# information.
-database connection = TODO
+# Database file path
+database = ./database.db
 
 # Enable artwork (default is yes).
 # artwork = no

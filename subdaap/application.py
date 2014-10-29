@@ -1,9 +1,8 @@
-from subdaap import provider, config, database, cache, utils
+from subdaap import provider, config, database, cache, utils, subsonic
 
 from gevent.pywsgi import WSGIServer
 from daapserver import zeroconf, create_server_app
 
-import libsonic
 import logging
 import errno
 import os
@@ -41,12 +40,17 @@ class Application(object):
         Setup the database connection, the SubSonic connection and provider.
         """
 
-        host, port = utils.parse_subsonic_url(self.config["SubSonic"]["url"])
-        db = database.Database(self.config["Provider"]["database connection"])
-        connection = libsonic.Connection(host,
-            self.config["SubSonic"]["username"],
-            self.config["SubSonic"]["password"], port=port)
+        # Initialize connections
+        connections = {}
 
+        for name, config in self.config["SubSonic"].iteritems():
+            connections[config["index"]] = subsonic.Connection(name,
+                config["url"], config["username"], config["password"])
+
+        # Initialize database
+        db = database.Database(self.config["Provider"]["database"])
+
+        # Initialize cache
         artwork_cache_dir = self.get_cache_dir(
             self.config["Provider"]["artwork cache dir"])
         item_cache_dir = self.get_cache_dir(
@@ -56,9 +60,10 @@ class Application(object):
         self.item_cache = cache.ItemCache(connection, item_cache_dir,
             self.config["Provider"]["item cache size"])
 
-        logger.debug("Setup SubSonic provider")
-        self.provider = provider.SubSonicProvider(db=db, connection=connection,
-            artwork_cache=self.artwork_cache, item_cache=self.item_cache)
+        # Create provider
+        self.provider = provider.SubSonicProvider(db=db,
+            connections=connections, artwork_cache=self.artwork_cache,
+            item_cache=self.item_cache)
 
     def setup_server(self):
         """
