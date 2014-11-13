@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 # Time to wait for another item to finish, before failing.
 TIMEOUT_WAIT_FOR_READY = 60
 
-# Percentage of space to target during pruning
-PRUNE_THRESHOLD = 0.9
-
 class FileCacheItem(object):
     __slots__ = ("lock", "ready", "uses", "size", "type", "iterator", "data",
         "permanent")
@@ -33,7 +30,7 @@ class FileCacheItem(object):
         self.permanent = False
 
 class FileCache(object):
-    def __init__(self, connections, directory, max_size=None):
+    def __init__(self, connections, directory, max_size, prune_threshold):
         """
         Construct a new file cache.
 
@@ -45,6 +42,7 @@ class FileCache(object):
         self.connections = connections
         self.directory = directory
         self.max_size = max_size * 1024 * 1024
+        self.prune_threshold = prune_threshold
         self.current_size = 0
 
         self.items = OrderedDict()
@@ -167,7 +165,8 @@ class FileCache(object):
         candidates = []
 
         for cache_key, cache_item in self.iteritems():
-            if self.current_size < (self.max_size * PRUNE_THRESHOLD):
+            if self.current_size < (self.max_size *
+                (1.0 - self.prune_threshold)):
                 break
 
             if not cache_item.permanent or cache_item.uses == 0:
@@ -270,7 +269,8 @@ class ArtworkCache(FileCache):
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
         start = time.time()
-        remote_fd = self.connections[item.database_id].getCoverArt(item.id)
+        remote_fd = self.connections[item.remote_database_id].getCoverArt(
+            item.remote_id)
 
         cache_item.iterator = stream.stream_from_remote(cache_item.lock,
             remote_fd, cache_file, on_cache=on_cache)
@@ -325,7 +325,8 @@ class ItemCache(FileCache):
             self.load_from_disk(item, cache_file, cache_key, cache_item)
 
         start = time.time()
-        remote_fd = self.connections[item.database_id].download(item.id - 1)
+        remote_fd = self.connections[item.remote_database_id].download(
+            item.remote_id)
 
         cache_item.type = item.file_type
         cache_item.size = item.file_size

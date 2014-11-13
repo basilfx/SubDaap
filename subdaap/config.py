@@ -17,7 +17,7 @@ password = string
 [Daap]
 name = string
 interface = string(default="0.0.0.0")
-port = integer(min=0, max=65535, default=3689)
+port = integer(min=1, max=65535, default=3689)
 password = string(default="")
 zeroconf = boolean(default=True)
 
@@ -28,10 +28,12 @@ artwork = boolean(default=True)
 artwork cache = boolean(default=True)
 artwork cache dir = string(default="./artwork")
 artwork cache size = integer(min=0, default=0)
+artwork cache prune threshold = float(min=0, max=1.0, default=0.1)
 
 item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
+item cache prune threshold = float(min=0, max=1.0, default=0.25)
 """
 
 def get_config(config_file):

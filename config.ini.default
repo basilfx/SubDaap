@@ -58,6 +58,10 @@ artwork cache dir = ./artwork
 # Max size (in MB) before old artwork will be pruned (default is 0, unlimited).
 artwork cache size = 1024
 
+# Percentage of cache size to clean while pruning (default is 0.1). Higher
+# values will make more space, but may remove too much
+# artwork cache prune threshold = 0.10
+
 # Cache items (default is yes, faster)
 # item cache = no
 
@@ -67,3 +71,7 @@ item cache dir = ./files
 # Max size (in MB) before old files will be pruned (default is 0, unlimited).
 # This does not include the files that are permanently cached.
 item cache size = 10240
+
+# Percentage of cache size to clean while pruning (default is 0.25). Higher
+# values will make more space, but may remove too much
+# item cache prune threshold = 0.25

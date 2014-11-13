@@ -14,6 +14,10 @@ logger = logging.getLogger(__name__)
 class Application(object):
 
     def __init__(self, config_file, data_dir, verbose=0):
+        """
+        Construct a new application instance.
+        """
+
         self.config_file = config_file
         self.data_dir = data_dir
         self.verbose = verbose
@@ -56,16 +60,20 @@ class Application(object):
         item_cache_dir = self.get_cache_dir(
             self.config["Provider"]["item cache dir"])
         self.artwork_cache = cache.ArtworkCache(connections, artwork_cache_dir,
-            self.config["Provider"]["artwork cache size"])
+            self.config["Provider"]["artwork cache size"],
+            self.config["Provider"]["artwork cache prune threshold"])
         self.item_cache = cache.ItemCache(connections, item_cache_dir,
-            self.config["Provider"]["item cache size"])
+            self.config["Provider"]["item cache size"],
+            self.config["Provider"]["item cache prune threshold"])
 
         # Create provider
         logger.debug("Setting up Provider with %d connections",
             len(connections))
+
+        state_file = os.path.join(self.get_cache_dir(), "provider.state")
         self.provider = provider.SubSonicProvider(db=db,
             connections=connections, artwork_cache=self.artwork_cache,
-            item_cache=self.item_cache)
+            item_cache=self.item_cache, state_file=state_file)
 
     def setup_server(self):
         """
