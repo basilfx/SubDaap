@@ -15,56 +15,57 @@ class DatabaseCollection(models.Collection):
 
         if self.key == models.KEY_DATABASES:
             query = ("""
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        `databases`
-                    WHERE
-                        `databases`.`exclude` = 0
-                    LIMIT 1
-                    """, )
+                SELECT
+                    COUNT(*)
+                FROM
+                    `databases`
+                WHERE
+                    `databases`.`exclude` = 0
+                LIMIT 1
+                """, )
         elif self.key == models.KEY_ITEMS:
             query = ("""
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        `items`
-                    LEFT OUTER JOIN
-                        `artists` ON `items`.`artist_id`=`artists`.`id`
-                    LEFT OUTER JOIN
-                        `albums` ON `items`.`album_id`=`albums`.`id`
-                    WHERE
-                        `items`.`database_id` = ? AND
-                        `items`.`exclude` = 0 AND
-                        `artists`.`exclude` = 0 AND
-                        `albums`.`exclude` = 0
-                    LIMIT 1
-                    """, (self.parent.id, ))
+                SELECT
+                    COUNT(*)
+                FROM
+                    `items`
+                LEFT OUTER JOIN
+                    `artists` ON `items`.`artist_id`=`artists`.`id`
+                LEFT OUTER JOIN
+                    `albums` ON `items`.`album_id`=`albums`.`id`
+                WHERE
+                    `items`.`database_id` = ? AND
+                    `items`.`exclude` = 0 AND
+                    `artists`.`exclude` = 0 AND
+                    `albums`.`exclude` = 0
+                LIMIT 1
+                """, self.parent.id)
         elif self.key == models.KEY_CONTAINERS:
             query = ("""
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        `containers`
-                    WHERE
-                        `containers`.`database_id` = ? AND
-                        `containers`.`exclude` = 0
-                    LIMIT 1
-                    """, (self.parent.id, ))
+                SELECT
+                    COUNT(*)
+                FROM
+                    `containers`
+                WHERE
+                    `containers`.`database_id` = ? AND
+                    `containers`.`exclude` = 0
+                LIMIT 1
+                """, self.parent.id)
         elif self.key == models.KEY_CONTAINER_ITEMS:
             query = ("""
-                    SELECT
-                        COUNT(*)
-                    FROM
-                        `container_items`
-                    WHERE
-                        `container_items`.`container_id` = ? AND
-                        `container_items`.`exclude` = 0
-                    LIMIT 1
-                    """, (self.parent.id, ))
+                SELECT
+                    COUNT(*)
+                FROM
+                    `container_items`
+                WHERE
+                    `container_items`.`container_id` = ? AND
+                    `container_items`.`database_id` = ?
+                LIMIT 1
+                """, self.parent.id, self.parent.database_id)
 
         # Execute query
-        return self.parent.db.query_value(*query)
+        with self.parent.db.get_cursor() as cursor:
+            return cursor.query_value(*query)
 
     def load_items(self):
         """
@@ -76,85 +77,110 @@ class DatabaseCollection(models.Collection):
             if self.key == models.KEY_DATABASES:
                 clazz = Database
                 query = ("""
-                        SELECT
-                            *
-                        FROM
-                            `databases`
-                        WHERE
-                            `databases`.`exclude` = 0
-                        """, )
+                    SELECT
+                        `databases`.`id`,
+                        `databases`.`persistent_id`,
+                        `databases`.`name`
+                    FROM
+                        `databases`
+                    WHERE
+                        `databases`.`exclude` = 0
+                    """, )
             elif self.key == models.KEY_ITEMS:
                 clazz = Item
                 query = ("""
-                        SELECT
-                            `items`.*,
-                            `artists`.`name` as `artist`,
-                            `albums`.`name` as `album`,
-                            `albums`.`art` as `album_art`,
-                            `albums`.`art_name` as `album_art_name`,
-                            `albums`.`art_size` as `album_art_size`,
-                            `albums`.`art_type` as `album_art_type`
-                        FROM
-                            `items`
-                        LEFT OUTER JOIN
-                            `artists` ON `items`.`artist_id`=`artists`.`id`
-                        LEFT OUTER JOIN
-                            `albums` ON `items`.`album_id`=`albums`.`id`
-                        WHERE
-                            `items`.`database_id` = ? AND
-                            `items`.`exclude` = 0 AND
-                            `artists`.`exclude` = 0 AND
-                            `albums`.`exclude` = 0
-                        """, (self.parent.id, ))
+                    SELECT
+                        `items`.`id`,
+                        `items`.`database_id`,
+                        `items`.`persistent_id`,
+                        `items`.`name`,
+                        `items`.`track`,
+                        `items`.`year`,
+                        `items`.`bitrate`,
+                        `items`.`duration`,
+                        `items`.`file_size`,
+                        `items`.`file_name`,
+                        `items`.`file_type`,
+                        `items`.`file_suffix`,
+                        `items`.`genre`,
+                        `artists`.`name` as `artist`,
+                        `albums`.`name` as `album`,
+                        `albums`.`art` as `album_art`
+                    FROM
+                        `items`
+                    LEFT OUTER JOIN
+                        `artists` ON `items`.`artist_id`=`artists`.`id`
+                    LEFT OUTER JOIN
+                        `albums` ON `items`.`album_id`=`albums`.`id`
+                    WHERE
+                        `items`.`database_id` = ? AND
+                        `items`.`exclude` = 0 AND
+                        `artists`.`exclude` = 0 AND
+                        `albums`.`exclude` = 0
+                    """, self.parent.id)
             elif self.key == models.KEY_CONTAINERS:
                 clazz = Container
                 query = ("""
-                        SELECT
-                            *
-                        FROM
-                            `containers`
-                        WHERE
-                            `containers`.`database_id` = ? AND
-                            `containers`.`exclude` = 0
-                        """, (self.parent.id, ))
+                    SELECT
+                        `containers`.`id`,
+                        `containers`.`database_id`,
+                        `containers`.`persistent_id`,
+                        `containers`.`name`,
+                        `containers`.`is_base`,
+                        `containers`.`is_smart`
+                    FROM
+                        `containers`
+                    WHERE
+                        `containers`.`database_id` = ? AND
+                        `containers`.`exclude` = 0
+                    """, self.parent.id)
             elif self.key == models.KEY_CONTAINER_ITEMS:
                 clazz = ContainerItem
                 query = ("""
-                        SELECT
-                            *
-                        FROM
-                            `container_items`
-                        WHERE
-                            `container_items`.`container_id` = ? AND
-                            `container_items`.`exclude` = 0
-                        """, (self.parent.id, ))
+                    SELECT
+                        `container_items`.`id`,
+                        `container_items`.`item_id`,
+                        `container_items`.`container_id`
+                    FROM
+                        `container_items`
+                    WHERE
+                        `container_items`.`container_id` = ? AND
+                        `container_items`.`database_id` = ?
+                    """, self.parent.id, self.parent.database_id)
 
             # Convert rows to items
             parent = self.parent
             item_buffer = []
 
-            for row in parent.db.query_all(*query):
-                item = clazz(row=row, db=parent.db, storage=parent.storage)
-                item.key = (parent.key << 32) + (self.key << 24) + item.id
+            with self.parent.db.get_cursor() as cursor:
+                for row in cursor.query(*query):
+                    item = clazz(db=parent.db, storage=parent.storage)
 
-                item_buffer.append((item.id, item))
+                    # Copy data from row to instance. Note that since the
+                    # instance is slotted, the row keys should match!
+                    for key in row.keys():
+                        setattr(item, key, row[key])
 
-                # Process items per `count'
-                if len(item_buffer) == count:
-                    self.parent.storage.load(parent_key, item_buffer)
+                    item.key = (parent.key << 32) + (self.key << 24) + item.id
+                    item_buffer.append((item.id, item))
 
-                    for iter_item in item_buffer:
-                        self.iter_item = iter_item
-                        yield iter_item
+                    # Process items per `count'
+                    if len(item_buffer) == count:
+                        self.parent.storage.load(parent_key, item_buffer)
 
-                    item_buffer[:] = []
+                        for iter_item in item_buffer:
+                            self.iter_item = iter_item
+                            yield iter_item
 
-            # Process remaining items
-            self.parent.storage.load(parent_key, item_buffer)
+                        # Empty buffer, but re-use existing
+                        item_buffer[:] = []
 
-            for iter_item in item_buffer:
-                self.iter_item = iter_item
-                yield iter_item
+                # Process remaining items
+                self.parent.storage.load(parent_key, item_buffer)
+
+                for iter_item in item_buffer:
+                    self.iter_item = iter_item
+                    yield iter_item
 
             # Restore last item
             self.iter_item = None
@@ -216,68 +242,67 @@ class DatabaseCollection(models.Collection):
 
 
 class Server(models.Server):
+    """
+    Database-aware Server object.
+    """
+
     __slots__ = models.Server.__slots__ + ("db", )
 
     collection_class = DatabaseCollection
 
     def __init__(self, db, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
-
         self.db = db
 
 class Database(models.Database):
+    """
+    Database-aware Database object.
+    """
+
     __slots__ = models.Database.__slots__ + ("db", )
 
     collection_class = DatabaseCollection
 
-    def __init__(self, row, db, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super(Database, self).__init__(*args, **kwargs)
-
         self.db = db
-
-        for key in row.keys():
-            if key in self.__slots__:
-                setattr(self, key, row[key])
 
 
 class Item(models.Item):
+    """
+    Database-aware Item object.
+    """
+
     __slots__ = models.Item.__slots__ + ("db", )
 
-    def __init__(self, row, db, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super(Item, self).__init__(*args, **kwargs)
-
         self.db = db
-
-        for key in row.keys():
-            if key in self.__slots__:
-                setattr(self, key, row[key])
 
 
 class Container(models.Container):
+    """
+    Database-aware Container object.
+    """
+
     __slots__ = models.Container.__slots__ + ("db", )
 
     collection_class = DatabaseCollection
 
-    def __init__(self, row, db, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super(Container, self).__init__(*args, **kwargs)
-
         self.db = db
-
-        for key in row.keys():
-            if key in self.__slots__:
-                setattr(self, key, row[key])
 
 
 class ContainerItem(models.ContainerItem):
+    """
+    Database-aware ContainerItem object.
+    """
+
     __slots__ = models.ContainerItem.__slots__ + ("db", )
 
     collection_class = DatabaseCollection
 
-    def __init__(self, row, db, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super(ContainerItem, self).__init__(*args, **kwargs)
-
         self.db = db
-
-        for key in row.keys():
-            if key in self.__slots__:
-                setattr(self, key, row[key])

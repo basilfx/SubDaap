@@ -24,7 +24,7 @@ def parse_arguments():
     parser.add_argument("-D", "--daemon", action="store_true",
         help="run as daemon")
     parser.add_argument("-v", "--verbose", nargs="?", action=VerboseAction,
-        default=0, help="toggle verbose mode (-vv, -vvv, etc. for more)")
+        default=0, help="toggle verbose mode (-vv, -vvv for more)")
     parser.add_argument("-c", "--config-file", action=PathAction,
         default="config.ini", help="config file")
     parser.add_argument("-d", "--data-dir", action=PathAction,
@@ -38,13 +38,12 @@ def parse_arguments():
     return parser.parse_args(), parser
 
 def setup_logging(verbose, log_file):
+    """
+    """
+
     # Setup logging
     logging.basicConfig(level=logging.DEBUG if verbose > 0 else logging.INFO,
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
-
-    # Enable SQL statement logging
-    if verbose > 2:
-        logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
     logger.info("Verbose level is %d", verbose)
 
