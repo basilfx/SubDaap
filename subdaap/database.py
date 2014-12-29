@@ -127,6 +127,7 @@ class Database(object):
                         `id` INTEGER PRIMARY KEY,
                         `persistent_id` INTEGER DEFAULT 0,
                         `database_id` int(11) NOT NULL,
+                        `parent_id` int(11) DEFAULT NULL,
                         `name` varchar(255) NOT NULL,
                         `is_base` int(1) NOT NULL,
                         `is_smart` int(1) NOT NULL,
@@ -134,7 +135,8 @@ class Database(object):
                         `cache` tinyint(1) DEFAULT 0,
                         `checksum` int(11) NOT NULL,
                         `remote_id` int(11) DEFAULT NULL,
-                        CONSTRAINT `container_fk` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                        CONSTRAINT `container_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)
+                        CONSTRAINT `container_fk_2` FOREIGN KEY (`parent_id`) REFERENCES `containers` (`id`)
                     );
                     CREATE TABLE IF NOT EXISTS `container_items` (
                         `id` INTEGER PRIMARY KEY,
@@ -153,7 +155,7 @@ class Cursor(sqlite3.Cursor):
     Cursor wrapper to add useful methods to the default Cursor object.
     """
 
-    def query_value(self, query, *args):
+    def query_value(self, query, *args, **kwargs):
         return self.execute(query, args).fetchone()[0]
 
     def query_dict(self, query, *args):

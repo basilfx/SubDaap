@@ -54,8 +54,8 @@ class Connection(libsonic.Connection):
 
         response = super(Connection, self).getIndexes(*args, **kwargs)
         response["indexes"] = response.get("indexes", {})
-        response["indexes"]["index"] = _index_iterator(
-            response["indexes"].get("index"))
+        response["indexes"]["index"] = list(_index_iterator(
+            response["indexes"].get("index")))
 
         return response
 
@@ -69,8 +69,8 @@ class Connection(libsonic.Connection):
                 yield playlist
 
         response = super(Connection, self).getPlaylists(*args, **kwargs)
-        response["playlists"]["playlist"] = _playlists_iterator(
-            response["playlists"].get("playlist"))
+        response["playlists"]["playlist"] = list(_playlists_iterator(
+            response["playlists"].get("playlist")))
 
         return response
 
@@ -89,8 +89,8 @@ class Connection(libsonic.Connection):
                 yield album
 
         response = super(Connection, self).getArtist(*args, **kwargs)
-        response["artist"]["album"] = _albums_iterator(
-            response["artist"].get("album"))
+        response["artist"]["album"] = list(_albums_iterator(
+            response["artist"].get("album")))
 
         return response
 
@@ -114,7 +114,7 @@ class Connection(libsonic.Connection):
                 yield child
 
         response = super(Connection, self).getMusicDirectory(*args, **kwargs)
-        response["directory"]["child"] = _children_iterator(
-            response["directory"].get("child"))
+        response["directory"]["child"] = list(_children_iterator(
+            response["directory"].get("child")))
 
         return response
