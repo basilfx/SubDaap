@@ -37,14 +37,29 @@ def parse_arguments():
     # Parse command line
     return parser.parse_args(), parser
 
-def setup_logging(verbose, log_file):
+def setup_logging(console=True, logfile=False, verbose=False):
     """
     """
 
-    # Setup logging
-    logging.basicConfig(level=logging.DEBUG if verbose > 0 else logging.INFO,
-        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    # Configure logging
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    level = logging.DEBUG if verbose else logging.INFO
 
+    # Add console output
+    if console:
+        console_log_handler = logging.StreamHandler()
+        console_log_handler.setLevel(level)
+        console_log_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(console_log_handler)
+
+    # Add file output
+    if logfile:
+        file_log_handler = logging.FileHandler(logfile)
+        file_log_handler.setLevel(level)
+        file_log_handler.setFormatter(formatter)
+        logging.getLogger().addHandler(file_log_handler)
+
+    logging.getLogger().setLevel(level)
     logger.info("Verbose level is %d", verbose)
 
 def daemonize(pid_file=None):
@@ -111,7 +126,7 @@ def main():
     if arguments.daemon:
         daemonize(arguments.pid_file)
 
-    setup_logging(arguments.verbose, arguments.log_file)
+    setup_logging(not arguments.daemon, arguments.log_file, arguments.verbose)
 
     # Change to data directory
     os.chdir(arguments.data_dir)
@@ -130,9 +145,6 @@ def main():
         application.start()
     except KeyboardInterrupt:
         application.stop()
-
-    # Done
-    return 0
 
 # E.g. `python SubDaap.py --daemonize --config-file=config.ini"
 if __name__ == "__main__":
