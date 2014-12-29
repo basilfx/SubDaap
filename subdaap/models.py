@@ -125,6 +125,7 @@ class DatabaseCollection(models.Collection):
                         `containers`.`id`,
                         `containers`.`database_id`,
                         `containers`.`persistent_id`,
+                        `containers`.`parent_id`,
                         `containers`.`name`,
                         `containers`.`is_base`,
                         `containers`.`is_smart`
@@ -254,6 +255,21 @@ class Server(models.Server):
         super(Server, self).__init__(*args, **kwargs)
         self.db = db
 
+    def get_cached_items(self):
+        with self.db.get_cursor() as cursor:
+            return cursor.query_dict("""
+                SELECT
+                    `items`.`id`,
+                    `items`.`database_id`,
+                    `items`.`remote_id`
+                FROM
+                    `items`
+                WHERE
+                    `items`.`cache` = 1 AND
+                    `items`.`exclude` = 0
+                """)
+
+
 class Database(models.Database):
     """
     Database-aware Database object.
@@ -279,6 +295,16 @@ class Item(models.Item):
         super(Item, self).__init__(*args, **kwargs)
         self.db = db
 
+    def get_remote_id(self):
+        with self.db.get_cursor() as cursor:
+            return cursor.query_value("""
+                SELECT
+                    `items`.`remote_id`
+                FROM
+                    `items`
+                WHERE
+                    `items`.`id` = ?
+                """, self.id)
 
 class Container(models.Container):
     """

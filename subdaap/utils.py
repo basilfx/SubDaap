@@ -1,6 +1,4 @@
 import argparse
-import urlparse
-import random
 import zlib
 import uuid
 import os
@@ -28,9 +26,6 @@ class PathAction(argparse.Action):
 
         setattr(args, self.dest, path)
 
-def generate_persistent_id():
-    return random.randrange(-2**(64-1), 2**(64 - 1) - 1)
-
 def dict_checksum(input_dict):
     """
     Calculate a hash of the values of a dictionary.
@@ -46,6 +41,10 @@ def dict_checksum(input_dict):
     return zlib.adler32(buffer(data))
 
 def force_dict(value):
+    """
+    Coerce the input value to a dict.
+    """
+
     if type(value) == dict:
         return value
     else:
@@ -73,5 +72,11 @@ def human_bytes(size):
 def in_list(input_list):
     """
     """
-
     return ",".join(str(x) for x in input_list)
+
+def exhaust(iterator):
+    """
+    """
+
+    for _ in iterator:
+        pass

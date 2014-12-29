@@ -59,10 +59,10 @@ class Application(object):
             self.config["Provider"]["artwork cache dir"])
         item_cache_dir = self.get_cache_dir(
             self.config["Provider"]["item cache dir"])
-        self.artwork_cache = cache.ArtworkCache(connections, artwork_cache_dir,
+        artwork_cache = cache.ArtworkCache(artwork_cache_dir,
             self.config["Provider"]["artwork cache size"],
             self.config["Provider"]["artwork cache prune threshold"])
-        self.item_cache = cache.ItemCache(connections, item_cache_dir,
+        item_cache = cache.ItemCache(item_cache_dir,
             self.config["Provider"]["item cache size"],
             self.config["Provider"]["item cache prune threshold"])
 
@@ -72,8 +72,8 @@ class Application(object):
 
         state_file = os.path.join(self.get_cache_dir(), "provider.state")
         self.provider = provider.SubSonicProvider(db=db,
-            connections=connections, artwork_cache=self.artwork_cache,
-            item_cache=self.item_cache, state_file=state_file)
+            connections=connections, artwork_cache=artwork_cache,
+            item_cache=item_cache, state_file=state_file)
 
     def setup_server(self):
         """
@@ -98,10 +98,8 @@ class Application(object):
         Start server and publishes zeroconf.
         """
 
-        self.artwork_cache.index()
-        self.item_cache.index()
-
         self.provider.synchronize()
+        self.provider.cache()
 
         if self.zeroconf:
             self.zeroconf.publish()

@@ -47,6 +47,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
                             break
 
                         local_fd.write(chunk)
+                        bytes_read += len(chunk)
 
                 # Move the temp file to the target file. On the same disk, this
                 # should be an atomic operation.
@@ -57,7 +58,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
 
         # Invoke callback, if fully exhausted
         if exhausted and on_cache:
-            on_cache()
+            on_cache(bytes_read)
 
     def _cacher(begin, end):
         put = False

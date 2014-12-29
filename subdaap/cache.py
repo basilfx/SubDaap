@@ -24,13 +24,12 @@ class FileCacheItem(object):
         self.uses = 0
 
         self.size = 0
-        self.type = None
         self.iterator = None
         self.data = None
         self.permanent = False
 
 class FileCache(object):
-    def __init__(self, connections, directory, max_size, prune_threshold):
+    def __init__(self, directory, max_size, prune_threshold):
         """
         Construct a new file cache.
 
@@ -39,7 +38,6 @@ class FileCache(object):
 
         self.name = self.__class__.__name__
 
-        self.connections = connections
         self.directory = directory
         self.max_size = max_size * 1024 * 1024
         self.prune_threshold = prune_threshold
@@ -48,26 +46,37 @@ class FileCache(object):
         self.items = OrderedDict()
         self.items_lock = gevent.lock.Semaphore()
 
-    def index(self):
+        self.permanent_cache_keys = None
+
+    def index(self, permanent_cache_keys):
         """
         Read the cache directory and determine it's size.
         """
 
+        self.permanent_cache_keys = permanent_cache_keys
+
         # Walk all files and sum their size
         for root, directories, files in os.walk(self.directory):
             if directories:
-                logger.warning(
-                    "Found unexpected directories in cache directory: %s", root)
+                logger.warning("Found unexpected directories in cache " \
+                    "directory: %s", root)
 
-            for cache_key in files:
-                cache_file = os.path.join(self.directory, cache_key)
+            for cache_file in files:
+                try:
+                    cache_file = os.path.join(self.directory, cache_file)
+                    cache_key = self.cache_file_to_cache_key(cache_file)
+                except ValueError:
+                    logger.warning("Found unexpected file in cache " \
+                        "directory: %s", cache_file)
+                    continue
+
+                permanent = cache_key in permanent_cache_keys
 
                 self.items[cache_key] = FileCacheItem()
                 self.items[cache_key].size = os.stat(cache_file).st_size
+                self.items[cache_key].permanent = permanent
 
-        # TODO: mark files as permanent or not
-
-        # Sum sizes of all temporary files
+        # Sum sizes of all non-permanent files
         count = 0
 
         for item in self.items.itervalues():
@@ -89,68 +98,72 @@ class FileCache(object):
                 self.expire()
         gevent.spawn(_task)
 
-    def get(self, item):
+    def cache_key_to_cache_file(self, cache_key):
         """
-        Load item from the cache, or cache it from remote if it does not exist
-        yet.
+        Get complete path to cache file, given a cache key.
         """
+        return os.path.join(self.directory, str(cache_key))
 
-        cache_key = self.get_cache_key(item)
-        cache_file = os.path.join(self.directory, cache_key)
+    def cache_file_to_cache_key(self, cache_file):
+        """
+        Get cache key, given a cache file.
+        """
+        return int(os.path.basename(cache_file))
+
+    def get(self, cache_key):
+        """
+        Get item from the cache.
+        """
 
         # Load item from cache. If it is found in cache, move it on top of the
         # OrderedDict, so it is marked as most-recently accessed and therefore
         # least likely to get pruned.
         new_item = False
+        wait_for_ready = True
 
         with self.items_lock:
             try:
                 cache_item = self.items[cache_key]
-
-                # Move it on top of OrderedDict, so it is most-recently accessed.
                 del self.items[cache_key]
                 self.items[cache_key] = cache_item
             except KeyError:
                 self.items[cache_key] = cache_item = FileCacheItem()
+                cache_item.permanent = cache_key in self.permanent_cache_keys
                 new_item = True
 
-        # The item can be either new, or it could be unloaded in the past.
-        if not cache_item.lock:
-            cache_item.lock = gevent.lock.RLock()
-            cache_item.ready = gevent.event.Event()
+            # The item can be either new, or it could be unloaded in the past.
+            if cache_item.ready is None or cache_item.lock is None:
+                cache_item.ready = gevent.event.Event()
+                cache_item.lock = gevent.lock.RLock()
+                wait_for_ready = False
 
-            # Mark as ready. Without this call, it would block forever
-            cache_item.ready.set()
+            # The file is not in cache, but we allocated an instance so the
+            # caller can load it. This is actually needed to prevent a second
+            # request from also loading it, hence cache_item not ready.
+            if new_item:
+                return cache_item
 
-        # Wait until the cache_item is ready for use. This could be the case
-        # when the file is downloaded or loaded from disk. Without the check,
-        # this call would block forever
-        if not new_item:
-            logger.debug("%s: waiting for item '%s'", self.name, cache_key)
+        # Wait until the cache_item is ready for use, e.g. another request is
+        # downloading the file.
+        if wait_for_ready:
+            logger.debug("%s: waiting for item '%s' to be ready.",
+                self.name, cache_key)
 
             if not cache_item.ready.wait(timeout=TIMEOUT_WAIT_FOR_READY):
-                logger.error("%s: waiting for item '%s' failed", self.name,
-                    cache_key)
+                raise Exception("Waiting for cache item timed out.")
 
-        # Data is loaded, and an iterator is available to stream the data. Use
-        # it and return.
-        if cache_item.iterator:
-            logger.debug("%s: item '%s' ready and loaded", self.name, cache_key)
-            return cache_item
+        # Load the item from disk if it is not loaded.
+        if cache_item.iterator is None:
+            cache_item.ready.clear()
+            self.load(cache_key)
 
-        # File not loaded in memory. Load it either from disk, or download it
-        # from the remote server. Mark item as busy, so concurrent requests will
-        # wait until the data is available.
-        logger.debug("%s: item '%s' not ready, loading", self.name, cache_key)
-        cache_item.ready.clear()
-
-        if os.path.isfile(cache_file):
-            self.load_from_disk(item, cache_file, cache_key, cache_item)
-        else:
-            self.load_from_remote(item, cache_file, cache_key, cache_item)
-
-        # Done
         return cache_item
+
+    def contains(self, cache_key):
+        """
+        Check if a certain cache key is in the cache.
+        """
+        return cache_key in self.items
 
     def prune(self):
         """
@@ -158,7 +171,7 @@ class FileCache(object):
         """
 
         # Unlimited size
-        if self.max_size == 0 or self.current_size < self.max_size:
+        if not self.max_size or self.current_size < self.max_size:
             return
 
         # Determine candidates to remove.
@@ -178,12 +191,10 @@ class FileCache(object):
         # Actual removal
         with self.items_lock:
             for cache_key, cache_item in candidates:
-                cache_file = os.path.join(self.directory, cache_key)
-
-                self.unload(cache_key, cache_item)
+                self.unload(cache_key)
 
                 try:
-                    os.remove(cache_file)
+                    os.remove(self.cache_key_to_cache_file(cache_key))
                 except OSError as e:
                     logger.warning("%s: unable to remove file '%s' from " \
                         "cache: %s", self.name,
@@ -211,7 +222,7 @@ class FileCache(object):
 
         with self.items_lock:
             for cache_key, cache_item in candidates:
-                self.unload(cache_key, cache_item)
+                self.unload(cache_key)
 
                 cache_item.iterator = None
                 cache_item.lock = None
@@ -222,7 +233,7 @@ class FileCache(object):
 
     def update(self, cache_key, cache_item, cache_file, file_size):
         if cache_item.size != file_size:
-            if cache_item.size != 0:
+            if cache_item.size:
                 logger.warning("%s: file size of item '%s' changed from %d " \
                     "bytes to %d bytes while it was in cache.", self.name,
                     cache_key, cache_item.size, file_size)
@@ -233,11 +244,27 @@ class FileCache(object):
 
             cache_item.size = file_size
 
-class ArtworkCache(FileCache):
-    def get_cache_key(self, item):
-        return "artwork_%d" % item.id
+    def download(self, cache_key, remote_fd):
+        start = time.time()
 
-    def load_from_disk(self, item, cache_file, cache_key, cache_item):
+        def on_cache(file_size):
+            logger.debug("%s: downloading '%s' took %.2f seconds.",
+                self.name, cache_key, time.time() - start)
+
+            remote_fd.close()
+            self.load(cache_key)
+
+        cache_item = self.items[cache_key]
+        cache_file = self.cache_key_to_cache_file(cache_key)
+        cache_item.iterator = stream.stream_from_remote(cache_item.lock,
+            remote_fd, cache_file, on_cache=on_cache)
+
+
+class ArtworkCache(FileCache):
+    def load(self, cache_key):
+        cache_item = self.items[cache_key]
+        cache_file = self.cache_key_to_cache_file(cache_key)
+
         def on_start():
             cache_item.uses += 1
             logger.debug("%s: incremented '%s' use to %d", self.name, cache_key,
@@ -256,54 +283,34 @@ class ArtworkCache(FileCache):
 
         cache_item.iterator = stream.stream_from_file(cache_item.lock,
             local_fd, file_size, on_start=on_start, on_finish=on_finish)
-
-        # Mark item ready
         cache_item.ready.set()
 
-    def load_from_remote(self, item, cache_file, cache_key, cache_item):
-        def on_cache():
-            logger.debug("%s: loading '%s' from remote took %.2f seconds.",
-                self.name, cache_key, time.time() - start)
+    def unload(self, cache_key):
+        cache_item = self.items[cache_key]
 
-            remote_fd.close()
-            self.load_from_disk(item, cache_file, cache_key, cache_item)
-
-        start = time.time()
-        remote_fd = self.connections[item.remote_database_id].getCoverArt(
-            item.remote_id)
-
-        cache_item.iterator = stream.stream_from_remote(cache_item.lock,
-            remote_fd, cache_file, on_cache=on_cache)
-
-    def load(self, item, cache_file, cache_key, cache_item):
-        pass
-
-    def unload(self, cache_key, cache_item):
         if cache_item.data:
             cache_item.data.close()
-
             cache_item.data = None
 
 class ItemCache(FileCache):
 
-    def get_cache_key(self, item):
-        return "item_%d" % item.id
+    def load(self, cache_key):
+        cache_item = self.items[cache_key]
+        cache_file = self.cache_key_to_cache_file(cache_key)
 
-    def load_from_disk(self, item, cache_file, cache_key, cache_item):
         def on_start():
             cache_item.uses += 1
-            logger.debug("%s: incremented '%s' use to %d", self.name, cache_key,
-                cache_item.uses)
+            logger.debug("%s: incremented '%s' use to %d.",
+                self.name, cache_key, cache_item.uses)
 
         def on_finish():
             cache_item.uses -= 1
-            logger.debug("%s: decremented '%s' use to %d", self.name, cache_key,
-                cache_item.uses)
+            logger.debug("%s: decremented '%s' use to %d.",
+                self.name, cache_key, cache_item.uses)
 
         file_size = os.stat(cache_file).st_size
-        file_path = os.path.join(self.directory, cache_key)
 
-        local_fd = open(file_path, "r+b")
+        local_fd = open(cache_file, "r+b")
         mmap_fd = mmap.mmap(local_fd.fileno(), 0, prot=mmap.PROT_READ)
         cache_item.data = local_fd, mmap_fd
 
@@ -312,28 +319,11 @@ class ItemCache(FileCache):
 
         cache_item.iterator = stream.stream_from_buffer(cache_item.lock,
             mmap_fd, file_size, on_start=on_start, on_finish=on_finish)
-
-        # Mark item ready.
         cache_item.ready.set()
 
-    def load_from_remote(self, item, cache_file, cache_key, cache_item):
-        def on_cache():
-            logger.debug("%s: loading '%s' from remote took %.2f seconds.",
-                self.name, cache_key, time.time() - start)
+    def unload(self, cache_key):
+        cache_item = self.items[cache_key]
 
-            remote_fd.close()
-            self.load_from_disk(item, cache_file, cache_key, cache_item)
-
-        start = time.time()
-        remote_fd = self.connections[item.remote_database_id].download(
-            item.remote_id)
-
-        cache_item.type = item.file_type
-        cache_item.size = item.file_size
-        cache_item.iterator = stream.stream_from_remote(cache_item.lock,
-            remote_fd, cache_file, on_cache=on_cache)
-
-    def unload(self, cache_key, cache_item):
         if cache_item.data:
             local_fd, mmap_fd = cache_item.data
 
