@@ -20,7 +20,6 @@ index = integer(min=1, default=1)
 url = string
 username = string
 password = string
-transcode = option("no", "unsupported", "all")
 
 [Daap]
 name = string
@@ -42,6 +41,8 @@ item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
+
+item transcode = option("no", "unsupported", "all", default="no")
 """ % CONFIG_VERSION
 
 

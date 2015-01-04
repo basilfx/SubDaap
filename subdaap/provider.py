@@ -14,6 +14,8 @@ import cPickle
 # Logger instance
 logger = logging.getLogger(__name__)
 
+TRANSCODE_UNSUPPORTED = ["flac"]
+
 
 class SubSonicProvider(provider.Provider):
 
@@ -21,7 +23,11 @@ class SubSonicProvider(provider.Provider):
 
     supports_persistent_id = True
 
-    def __init__(self, db, connections, artwork_cache, item_cache, state_file):
+    def __init__(self, db, connections, artwork_cache, item_cache, state_file,
+                 transcode):
+        """
+        """
+
         super(SubSonicProvider, self).__init__()
 
         self.db = db
@@ -30,8 +36,8 @@ class SubSonicProvider(provider.Provider):
         self.connections = connections
         self.artwork_cache = artwork_cache
         self.item_cache = item_cache
-
         self.state_file = state_file
+        self.transcode = transcode
 
         self.lock = gevent.lock.Semaphore()
         self.ready = gevent.event.Event()
@@ -40,6 +46,9 @@ class SubSonicProvider(provider.Provider):
         self.setup_library()
 
     def wait_for_update(self):
+        """
+        """
+
         # Block until next upate
         self.ready.wait()
 
@@ -47,6 +56,9 @@ class SubSonicProvider(provider.Provider):
         return self.server.storage.revision
 
     def setup_state(self):
+        """
+        """
+
         self.load_state()
 
         # Ensure keys are available
@@ -61,6 +73,9 @@ class SubSonicProvider(provider.Provider):
                 }
 
     def setup_library(self):
+        """
+        """
+
         self.synchronizers = {}
         self.server = Server(db=self.db)
 
@@ -71,6 +86,9 @@ class SubSonicProvider(provider.Provider):
                 connection, index)
 
     def cache(self):
+        """
+        """
+
         cached_items = self.server.get_cached_items()
 
         self.artwork_cache.index(cached_items)
@@ -78,11 +96,11 @@ class SubSonicProvider(provider.Provider):
 
         # Start a separate task to cache permanent files.
         def _cache():
-            logger.info("Caching %d permanent items", len(cached_items))
+            logger.info("Caching %d permanent items.", len(cached_items))
 
             for local_id in cached_items:
                 logger.debug("Caching item '%d'.", local_id)
-                database_id, remote_id = cached_items[local_id]
+                database_id, remote_id, file_suffix = cached_items[local_id]
 
                 # Artwork
                 if not self.artwork_cache.contains(local_id):
@@ -102,8 +120,8 @@ class SubSonicProvider(provider.Provider):
                     cache_item = self.item_cache.get(local_id)
 
                     if cache_item.iterator is None:
-                        remote_fd = self.connections[database_id].download(
-                            remote_id)
+                        remote_fd = self.get_item_fd(
+                            database_id, remote_id, file_suffix)
                         self.item_cache.download(local_id, remote_fd)
 
                         # Exhaust iterator so it actually downloads
@@ -114,6 +132,9 @@ class SubSonicProvider(provider.Provider):
         gevent.spawn(_cache)
 
     def synchronize(self):
+        """
+        """
+
         changed = False
 
         with self.lock:
@@ -129,7 +150,7 @@ class SubSonicProvider(provider.Provider):
             self.ready.set()
             self.ready.clear()
 
-        logger.info("Database initialized and loaded")
+        logger.info("Database initialized and loaded.")
 
     def get_artwork_data(self, session, item):
         """
@@ -152,8 +173,8 @@ class SubSonicProvider(provider.Provider):
         cache_item = self.item_cache.get(item.id)
 
         if cache_item.iterator is None:
-            remote_fd = self.connections[item.database_id].download(
-                item.get_remote_id())
+            remote_fd = self.get_item_fd(
+                item.database_id, item.get_remote_id(), item.file_suffix)
             self.item_cache.download(item.id, remote_fd)
 
             return cache_item.iterator(byte_range), item.file_type, \
@@ -161,12 +182,24 @@ class SubSonicProvider(provider.Provider):
         return cache_item.iterator(byte_range), item.file_type, \
             cache_item.size
 
+    def get_item_fd(self, database_id, remote_id, file_suffix):
+        """
+        """
+
+        if self.transcode == "all" or (self.transcode == "unsupported" and
+                file_suffix in TRANSCODE_UNSUPPORTED):
+            logger.debug("Transcoding item '%i'.", remote_id)
+            return self.connections[database_id].stream(
+                remote_id, tformat="mp3")
+        else:
+            return self.connections[database_id].download(remote_id)
+
     def load_state(self):
         """
         Load provider state.
         """
 
-        logger.debug("Loading provider state from '%s'", self.state_file)
+        logger.debug("Loading provider state from '%s'.", self.state_file)
 
         with self.lock:
             try:
@@ -184,7 +217,7 @@ class SubSonicProvider(provider.Provider):
         Save provider state.
         """
 
-        logger.debug("Saving provider state from '%s'", self.state_file)
+        logger.debug("Saving provider state from '%s'.", self.state_file)
 
         with self.lock:
             with open(self.state_file, "wb") as fp:
@@ -780,7 +813,8 @@ class Synchronizer(object):
             # Fetch local database ID
             database_id = self.database_id
 
-            container_id = cursor.query_value("""
+            container_id = cursor.query_value(
+                """
                 SELECT
                     `containers`.`id`
                 FROM
@@ -788,8 +822,10 @@ class Synchronizer(object):
                 WHERE
                     `containers`.`is_base` = 1 AND
                     `containers`.`database_id` = ?
-                """, database_id)
-            local_containers = cursor.query_dict("""
+                """,
+                database_id)
+            local_containers = cursor.query_dict(
+                """
                 SELECT
                     `remote_id`,
                     `checksum`,
@@ -799,7 +835,8 @@ class Synchronizer(object):
                 WHERE
                     `containers`.`is_base` = 0 AND
                     `containers`.`database_id` = ?
-                """, database_id)
+                """,
+                database_id)
 
             # Compute local IDs
             local_containers_ids = set(local_containers.iterkeys())
@@ -893,7 +930,8 @@ class Synchronizer(object):
         Request SubSonic's playlists and iterate each item.
         """
 
-        response = self.cache.get("playlists") or self.connection.getPlaylists()
+        response = self.cache.get("playlists") or \
+            self.connection.getPlaylists()
 
         for child in response["playlists"]["playlist"]:
             yield child
@@ -903,7 +941,8 @@ class Synchronizer(object):
         Request SubSonic's playlist items and iterate each item.
         """
 
-        for order, child in enumerate(utils.force_list(playlist["entry"]), start=1):
+        for order, child in enumerate(
+                utils.force_list(playlist["entry"]), start=1):
             child["order"] = order
 
             yield child

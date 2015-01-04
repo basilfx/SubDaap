@@ -74,7 +74,8 @@ class Application(object):
         state_file = os.path.join(self.get_cache_dir(), "provider.state")
         self.provider = provider.SubSonicProvider(
             db=db, connections=connections, artwork_cache=artwork_cache,
-            item_cache=item_cache, state_file=state_file)
+            item_cache=item_cache, state_file=state_file,
+            transcode=self.config["Provider"]["item transcode"])
 
     def setup_server(self):
         """

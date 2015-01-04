@@ -260,7 +260,8 @@ class Server(models.BaseServer):
                 SELECT
                     `items`.`id`,
                     `items`.`database_id`,
-                    `items`.`remote_id`
+                    `items`.`remote_id`,
+                    `items`.`file_suffix`
                 FROM
                     `items`
                 WHERE

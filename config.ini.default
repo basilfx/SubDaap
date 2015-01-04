@@ -22,10 +22,6 @@ username = TODO
 # Password
 password = TODO
 
-# Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
-# 'all'.
-# transcode = unsupported
-
 
 [Daap]
 
@@ -79,3 +75,7 @@ item cache size = 10240
 # Percentage of cache size to clean while pruning (default is 0.25). Higher
 # values will make more space, but may remove too much
 # item cache prune threshold = 0.25
+
+# Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
+# 'all'.
+# item transcode = unsupported
