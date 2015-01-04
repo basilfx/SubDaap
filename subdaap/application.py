@@ -1,7 +1,6 @@
 from subdaap import provider, config, database, cache, utils, subsonic, webserver
 
-from gevent.pywsgi import WSGIServer
-from daapserver import zeroconf, create_server_app
+from daapserver import DaapServer
 
 import logging
 import errno
@@ -24,7 +23,7 @@ class Application(object):
 
         self.server = None
         self.provider = None
-        self.zeroconf = None
+        self.bonjour = None
 
         # Setup all parts of the application
         self.setup_config()
@@ -77,43 +76,40 @@ class Application(object):
 
     def setup_server(self):
         """
-        Create DAAP server and setup zeroconf advertising.
+        Create DAAP server.
         """
 
-        bind = self.config["Daap"]["interface"], self.config["Daap"]["port"]
-        app = create_server_app(self.provider,
+        logger.debug("Setting up DAAP server at %s:%d",
+            self.config["Daap"]["interface"], self.config["Daap"]["port"])
+
+        self.server = DaapServer(
+            provider=self.provider,
             server_name=self.config["Daap"]["name"],
             password=self.config["Daap"]["password"],
+            ip=self.config["Daap"]["interface"],
+            port=self.config["Daap"]["port"],
+            cache=True,
+            bonjour=self.config["Daap"]["zeroconf"],
             debug=self.verbose > 1)
-        webserver.extend_server_app(self, app)
 
-        logger.debug("Setting up DAAP server at %s", bind)
-        self.server = WSGIServer(bind, application=app)
-
-        if self.config["Daap"]["zeroconf"]:
-            self.zeroconf = zeroconf.Zeroconf(self.config["Daap"]["name"],
-                self.config["Daap"]["port"], stype="_daap._tcp")
+        # Extend server with a web interface
+        webserver.extend_server_app(self, self.server.app)
 
     def start(self):
         """
-        Start server and publishes zeroconf.
+        Start server.
         """
 
         self.provider.synchronize()
         self.provider.cache()
 
-        if self.zeroconf:
-            self.zeroconf.publish()
-
         self.server.serve_forever()
 
     def stop(self):
         """
-        Unpublishes zeroconf.
+        Stop server.
         """
-
-        if self.zeroconf:
-            self.zeroconf.unpublish()
+        pass
 
     def get_cache_dir(self, *path):
         """

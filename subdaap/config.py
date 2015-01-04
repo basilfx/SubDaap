@@ -3,9 +3,17 @@ from cStringIO import StringIO
 from configobj import ConfigObj
 from validate import Validator
 
+import logging
+
+# Logger instance
+logger = logging.getLogger(__name__)
+
 # Config file specification
+CONFIG_VERSION = 1
 CONFIG_SPEC = \
 """
+version = integer(min=1, default=%d)
+
 [SubSonic]
 
 [[__many__]]
@@ -13,6 +21,7 @@ index = integer(min=1, default=1)
 url = string
 username = string
 password = string
+transcode = option("no", "unsupported", "all")
 
 [Daap]
 name = string
@@ -34,7 +43,7 @@ item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
-"""
+""" % CONFIG_VERSION
 
 def get_config(config_file):
     """
@@ -48,5 +57,6 @@ def get_config(config_file):
 
     # Convert types and validate file
     config.validate(validator, preserve_errors=True, copy=True)
+    logger.info("Config file version %d", config["version"])
 
     return config
