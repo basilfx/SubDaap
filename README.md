@@ -15,21 +15,14 @@ This project is an early and experiomental version. I use it for my personal lib
 * Revision support: efficient library updates pushed to all connected clients
 
 ## Requirements
-* Python 2.7+. PyPy 2.3 works and is a lot faster, but has some issues with Bonjour.
+* Python 2.7+. PyPy 2.3 works and is a lot faster.
 
 ## Installation
 This application was designed as a gateway between SubSonic and iTunes. Therefore, it's recommended to install this on the same system where you would access iTunes on. It can be installed on a central server, however.
 
 * Clone this repository
-* Install dependencies:
-  * `pip install git+https://github.com/crustymonkey/py-sonic.git`
-  * `pip install git+https://github.com/basilfx/flask-daapserver.git`
-  * `pip install git+https://github.com/basilfx/pybonjour-python3`
-  * `pip install gevent` (for Pypy: `pip install git+https://github.com/surfly/gevent`)
-  * `pip install flask`
-  * `pip install configobj`
-* Copy `config.ini.default` to `config.ini`
-  * Don't forget to change the database settings!
+* Install dependencies via `pip install -r requirements.txt`
+* Copy `config.ini.default` to `config.ini` and edit as desired.
 * `chmod 700 config.ini`, so others cannot view your credentials!
 
 ## Run the application
@@ -44,7 +37,7 @@ more verbose.
 
 ## Known issues
 * SQLite doesn't work when application runs as daemon.
-* Gevent will throw `Broken Pipe' exceptions. This is a known issue, see https://github.com/surfly/gevent/pull/377
+* Gevent may throw `Broken Pipe' exceptions. This is a known issue but can be ignored. See https://github.com/surfly/gevent/pull/377 for more information.
 
 ## License
 See the `LICENSE` file (MIT license).
