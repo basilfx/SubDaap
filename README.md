@@ -15,7 +15,7 @@ This project is an early and experiomental version. I use it for my personal lib
 * Revision support: efficient library updates pushed to all connected clients
 
 ## Requirements
-* Python 2.7+. PyPy 2.3 works and is a lot faster.
+* Python 2.7+. PyPy 2.4 works and is a lot faster.
 
 ## Installation
 This application was designed as a gateway between SubSonic and iTunes. Therefore, it's recommended to install this on the same system where you would access iTunes on. It can be installed on a central server, however.

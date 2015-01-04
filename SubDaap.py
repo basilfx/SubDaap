@@ -1,4 +1,4 @@
-#from gevent import monkey; monkey.patch_all()
+from gevent import monkey; monkey.patch_all()
 
 from subdaap.utils import VerboseAction, PathAction, NewPathAction
 from subdaap.application import Application
