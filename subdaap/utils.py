@@ -1,7 +1,7 @@
 import argparse
 import zlib
-import uuid
 import os
+
 
 class VerboseAction(argparse.Action):
     def __call__(self, parser, args, value, option_string=None):
@@ -12,9 +12,11 @@ class VerboseAction(argparse.Action):
 
         setattr(args, self.dest, value)
 
+
 class NewPathAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
         setattr(args, self.dest, os.path.abspath(values))
+
 
 class PathAction(argparse.Action):
     def __call__(self, parser, args, values, option_string=None):
@@ -25,6 +27,7 @@ class PathAction(argparse.Action):
                 option_string, path))
 
         setattr(args, self.dest, path)
+
 
 def dict_checksum(input_dict):
     """
@@ -40,6 +43,7 @@ def dict_checksum(input_dict):
 
     return zlib.adler32(buffer(data))
 
+
 def force_dict(value):
     """
     Coerce the input value to a dict.
@@ -49,6 +53,7 @@ def force_dict(value):
         return value
     else:
         return {}
+
 
 def force_list(value):
     """
@@ -62,6 +67,7 @@ def force_list(value):
     else:
         return [value]
 
+
 def human_bytes(size):
     for x in ["bytes", "KB", "MB", "GB"]:
         if size < 1024.0 and size > -1024.0:
@@ -69,10 +75,12 @@ def human_bytes(size):
         size /= 1024.0
     return "%3.1f%s" % (size, "TB")
 
+
 def in_list(input_list):
     """
     """
     return ",".join(str(x) for x in input_list)
+
 
 def exhaust(iterator):
     """

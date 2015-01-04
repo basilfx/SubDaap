@@ -1,14 +1,14 @@
-from subdaap import provider, config, database, cache, utils, subsonic, webserver
+from subdaap import provider, config, database, cache, subsonic, webserver
 
 from daapserver import DaapServer
 
 import logging
 import errno
 import os
-import time
 
 # Logger instance
 logger = logging.getLogger(__name__)
+
 
 class Application(object):
 
@@ -47,8 +47,8 @@ class Application(object):
         connections = {}
 
         for name, config in self.config["SubSonic"].iteritems():
-            connections[config["index"]] = subsonic.Connection(name,
-                config["url"], config["username"], config["password"])
+            connections[config["index"]] = subsonic.Connection(
+                name, config["url"], config["username"], config["password"])
 
         # Initialize database
         db = database.Database(self.config["Provider"]["database"])
@@ -58,20 +58,22 @@ class Application(object):
             self.config["Provider"]["artwork cache dir"])
         item_cache_dir = self.get_cache_dir(
             self.config["Provider"]["item cache dir"])
-        artwork_cache = cache.ArtworkCache(artwork_cache_dir,
+        artwork_cache = cache.ArtworkCache(
+            artwork_cache_dir,
             self.config["Provider"]["artwork cache size"],
             self.config["Provider"]["artwork cache prune threshold"])
-        item_cache = cache.ItemCache(item_cache_dir,
+        item_cache = cache.ItemCache(
+            item_cache_dir,
             self.config["Provider"]["item cache size"],
             self.config["Provider"]["item cache prune threshold"])
 
         # Create provider
-        logger.debug("Setting up Provider with %d connections",
-            len(connections))
+        logger.debug(
+            "Setting up Provider with %d connections", len(connections))
 
         state_file = os.path.join(self.get_cache_dir(), "provider.state")
-        self.provider = provider.SubSonicProvider(db=db,
-            connections=connections, artwork_cache=artwork_cache,
+        self.provider = provider.SubSonicProvider(
+            db=db, connections=connections, artwork_cache=artwork_cache,
             item_cache=item_cache, state_file=state_file)
 
     def setup_server(self):
@@ -79,7 +81,8 @@ class Application(object):
         Create DAAP server.
         """
 
-        logger.debug("Setting up DAAP server at %s:%d",
+        logger.debug(
+            "Setting up DAAP server at %s:%d",
             self.config["Daap"]["interface"], self.config["Daap"]["port"])
 
         self.server = DaapServer(
@@ -103,6 +106,7 @@ class Application(object):
         self.provider.synchronize()
         self.provider.cache()
 
+        logger.info("Serving requests.")
         self.server.serve_forever()
 
     def stop(self):
@@ -114,8 +118,8 @@ class Application(object):
     def get_cache_dir(self, *path):
         """
         Resolve the path to a cache directory. The path is relative to the data
-        directory. The directory will be created if it does not exists, and will
-        be tested for writing.
+        directory. The directory will be created if it does not exists, and
+        will be tested for writing.
         """
 
         full_path = os.path.abspath(os.path.normpath(
@@ -129,7 +133,7 @@ class Application(object):
             if e.errno == errno.EEXIST and os.path.isdir(full_path):
                 pass
             else:
-                raise Exception("Could not create cache folder: %s" % full_path)
+                raise Exception("Could not create folder: %s" % full_path)
 
         # Test for writing
         test_file = os.path.join(full_path, ".write-test")

@@ -1,4 +1,4 @@
-from subdaap.models import Server, Database, Container, Item
+from subdaap.models import Server
 from subdaap import utils
 
 from daapserver.utils import generate_persistent_id
@@ -8,12 +8,12 @@ import gevent.lock
 import gevent.event
 import gevent.queue
 
-import sys
 import logging
 import cPickle
 
 # Logger instance
 logger = logging.getLogger(__name__)
+
 
 class SubSonicProvider(provider.Provider):
 
@@ -70,7 +70,6 @@ class SubSonicProvider(provider.Provider):
                 self.state["connections"][index], self.server, self.db,
                 connection, index)
 
-
     def cache(self):
         cached_items = self.server.get_cached_items()
 
@@ -114,7 +113,6 @@ class SubSonicProvider(provider.Provider):
             logger.info("Caching permanent items finished.")
         gevent.spawn(_cache)
 
-
     def synchronize(self):
         changed = False
 
@@ -132,7 +130,6 @@ class SubSonicProvider(provider.Provider):
             self.ready.clear()
 
         logger.info("Database initialized and loaded")
-
 
     def get_artwork_data(self, session, item):
         """
@@ -159,8 +156,10 @@ class SubSonicProvider(provider.Provider):
                 item.get_remote_id())
             self.item_cache.download(item.id, remote_fd)
 
-            return cache_item.iterator(byte_range), item.file_type, item.file_size
-        return cache_item.iterator(byte_range), item.file_type, cache_item.size
+            return cache_item.iterator(byte_range), item.file_type, \
+                item.file_size
+        return cache_item.iterator(byte_range), item.file_type, \
+            cache_item.size
 
     def load_state(self):
         """
@@ -190,6 +189,7 @@ class SubSonicProvider(provider.Provider):
         with self.lock:
             with open(self.state_file, "wb") as fp:
                 cPickle.dump(self.state, fp)
+
 
 class Synchronizer(object):
 
@@ -328,7 +328,8 @@ class Synchronizer(object):
             })
 
             if self.database_id not in local_databases:
-                cursor = cursor.query("""
+                cursor = cursor.query(
+                    """
                     INSERT INTO `databases` (
                         `id`,
                         `persistent_id`,
@@ -345,7 +346,8 @@ class Synchronizer(object):
                 # Mark as added
                 added_databases.add(self.database_id)
             elif database_checksum != local_databases[self.database_id][0]:
-                cursor.query("""
+                cursor.query(
+                    """
                     UPDATE
                         `databases`
                     SET
@@ -370,7 +372,8 @@ class Synchronizer(object):
             })
 
             if not local_containers:
-                cursor = cursor.query("""
+                cursor = cursor.query(
+                    """
                     INSERT INTO `containers` (
                        `persistent_id`,
                        `database_id`,
@@ -394,7 +397,8 @@ class Synchronizer(object):
                 container_id = local_containers.keys()[0]
 
                 if container_checksum != local_containers[container_id][0]:
-                    cursor.query("""
+                    cursor.query(
+                        """
                         UPDATE
                             `containers`
                         SET
@@ -428,7 +432,8 @@ class Synchronizer(object):
             # Fetch local database ID and container ID
             database_id = self.database_id
 
-            container_id = cursor.query_value("""
+            container_id = cursor.query_value(
+                """
                 SELECT
                     `containers`.`id`
                 FROM
@@ -439,7 +444,8 @@ class Synchronizer(object):
                 """, database_id)
 
             # Load local items
-            local_artists = cursor.query_dict("""
+            local_artists = cursor.query_dict(
+                """
                 SELECT
                     `remote_id`,
                     `checksum`,
@@ -449,7 +455,8 @@ class Synchronizer(object):
                 WHERE
                     `artists`.`database_id` = ?
                 """, database_id)
-            local_albums = cursor.query_dict("""
+            local_albums = cursor.query_dict(
+                """
                 SELECT
                     `remote_id`,
                     `checksum`,
@@ -459,7 +466,8 @@ class Synchronizer(object):
                 WHERE
                     `albums`.`database_id` = ?
                 """, database_id)
-            local_items = cursor.query_dict("""
+            local_items = cursor.query_dict(
+                """
                 SELECT
                     `remote_id`,
                     `checksum`,
@@ -469,7 +477,8 @@ class Synchronizer(object):
                 WHERE
                     `items`.`database_id` = ?
                 """, database_id)
-            local_container_items = cursor.query_dict("""
+            local_container_items = cursor.query_dict(
+                """
                 SELECT
                     `item_id`
                 FROM
@@ -501,7 +510,8 @@ class Synchronizer(object):
 
                         # Check if artist has changed
                         if remote_artist_id not in local_artists:
-                            cursor.query("""
+                            cursor.query(
+                                """
                                 INSERT INTO `artists` (
                                     `database_id`,
                                     `name`,
@@ -516,10 +526,11 @@ class Synchronizer(object):
                                 artist_checksum)
 
                             # Store insert ID
-                            local_artists[remote_artist_id] = (artist_checksum,
-                                cursor.lastrowid)
+                            local_artists[remote_artist_id] = (
+                                artist_checksum, cursor.lastrowid)
                         elif artist_checksum != local_artists[remote_artist_id][0]:
-                            cursor.query("""
+                            cursor.query(
+                                """
                                 UPDATE
                                     `artists`
                                 SET
@@ -547,7 +558,8 @@ class Synchronizer(object):
 
                                 # Check if artist has changed
                                 if remote_album_id not in local_albums:
-                                    cursor.query("""
+                                    cursor.query(
+                                        """
                                         INSERT INTO `albums` (
                                            `database_id`,
                                            `artist_id`,
@@ -569,7 +581,8 @@ class Synchronizer(object):
                                     local_albums[remote_album_id] = (
                                         album_checksum, cursor.lastrowid)
                                 elif album_checksum != local_albums[remote_album_id][0]:
-                                    cursor.query("""
+                                    cursor.query(
+                                        """
                                         UPDATE
                                             `albums`
                                         SET
@@ -609,7 +622,8 @@ class Synchronizer(object):
 
                     # Check if item has changed
                     if remote_item_id not in local_items:
-                        cursor.query("""
+                        cursor.query(
+                            """
                             INSERT INTO `items` (
                                 `persistent_id`,
                                 `database_id`,
@@ -648,9 +662,11 @@ class Synchronizer(object):
                             item_checksum)
 
                         # Store insert ID
-                        local_items[remote_item_id] = (item_checksum, cursor.lastrowid)
+                        local_items[remote_item_id] = (
+                            item_checksum, cursor.lastrowid)
                     elif item_checksum != local_items[remote_item_id][0]:
-                        cursor.query("""
+                        cursor.query(
+                            """
                             UPDATE
                                 `items`
                             SET
@@ -692,7 +708,8 @@ class Synchronizer(object):
                 # Container item information
                 #
                 if local_items[remote_item_id][1] not in local_container_items_ids:
-                    cursor.query("""
+                    cursor.query(
+                        """
                         INSERT INTO `container_items` (
                             `persistent_id`,
                             `database_id`,
@@ -753,7 +770,6 @@ class Synchronizer(object):
                 added_items, deleted_items,
                 added_container_items, deleted_container_items)
 
-
     def sync_playlists(self):
         """
         """
@@ -799,7 +815,8 @@ class Synchronizer(object):
 
                     # Check if container has changed
                     if remote_container_id not in local_containers_ids:
-                        cursor = cursor.query("""
+                        cursor = cursor.query(
+                            """
                             INSERT INTO `containers` (
                                `persistent_id`,
                                `database_id`,
@@ -822,10 +839,11 @@ class Synchronizer(object):
                             container_checksum)
 
                         # Store insert ID
-                        local_containers[remote_container_id] = (container_checksum,
-                            cursor.lastrowid)
+                        local_containers[remote_container_id] = (
+                            container_checksum, cursor.lastrowid)
                     elif container_checksum != local_containers[remote_container_id][0]:
-                        cursor.query("""
+                        cursor.query(
+                            """
                             UPDATE
                                 `containers`
                             SET
@@ -844,7 +862,8 @@ class Synchronizer(object):
             deleted_containers = local_containers_ids - added_containers
 
             # Delete old containers
-            cursor.query("""
+            cursor.query(
+                """
                 DELETE FROM
                     `containers`
                 WHERE

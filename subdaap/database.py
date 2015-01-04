@@ -4,6 +4,7 @@ from gevent import lock
 
 import sqlite3
 
+
 class Database(object):
     """
     The Database instance handles all database interactions.
@@ -150,6 +151,7 @@ class Database(object):
                     );
                     """)
 
+
 class Cursor(sqlite3.Cursor):
     """
     Cursor wrapper to add useful methods to the default Cursor object.
@@ -162,7 +164,7 @@ class Cursor(sqlite3.Cursor):
         result = dict()
 
         for row in self.execute(query, args):
-            result[row[0]] = [ row[i] for i in range(1, len(row)) ]
+            result[row[0]] = [row[i] for i in range(1, len(row))]
 
         return result
 

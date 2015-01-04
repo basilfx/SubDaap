@@ -1,10 +1,9 @@
-from gevent import monkey; monkey.patch_all()
+#from gevent import monkey; monkey.patch_all()
 
 from subdaap.utils import VerboseAction, PathAction, NewPathAction
 from subdaap.application import Application
 
 import argparse
-import gevent
 import logging
 import atexit
 import sys
@@ -12,6 +11,7 @@ import os
 
 # Logger instance
 logger = logging.getLogger(__name__)
+
 
 def parse_arguments():
     """
@@ -21,28 +21,33 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
 
     # Add options
-    parser.add_argument("-D", "--daemon", action="store_true",
-        help="run as daemon")
-    parser.add_argument("-v", "--verbose", nargs="?", action=VerboseAction,
-        default=0, help="toggle verbose mode (-vv, -vvv for more)")
-    parser.add_argument("-c", "--config-file", action=PathAction,
-        default="config.ini", help="config file")
-    parser.add_argument("-d", "--data-dir", action=PathAction,
-        default=os.getcwd(), help="data directory")
-    parser.add_argument("-p", "--pid-file", action=NewPathAction,
-        help="pid file")
-    parser.add_argument("-l", "--log-file", action=NewPathAction,
-        help="log file")
+    parser.add_argument(
+        "-D", "--daemon", action="store_true", help="run as daemon")
+    parser.add_argument(
+        "-v", "--verbose", nargs="?", action=VerboseAction, default=0,
+        help="toggle verbose mode (-vv, -vvv for more)")
+    parser.add_argument(
+        "-c", "--config-file", action=PathAction, default="config.ini",
+        help="config file")
+    parser.add_argument(
+        "-d", "--data-dir", action=PathAction, default=os.getcwd(),
+        help="data directory")
+    parser.add_argument(
+        "-p", "--pid-file", action=NewPathAction, help="pid file")
+    parser.add_argument(
+        "-l", "--log-file", action=NewPathAction, help="log file")
 
     # Parse command line
     return parser.parse_args(), parser
+
 
 def setup_logging(console=True, logfile=False, verbose=False):
     """
     """
 
     # Configure logging
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     level = logging.DEBUG if verbose else logging.INFO
 
     # Add console output
@@ -61,6 +66,7 @@ def setup_logging(console=True, logfile=False, verbose=False):
 
     logging.getLogger().setLevel(level)
     logger.info("Verbose level is %d", verbose)
+
 
 def daemonize(pid_file=None):
     """
@@ -102,7 +108,7 @@ def daemonize(pid_file=None):
     stderr = file("/dev/null", "a+", 0)
 
     os.dup2(stdin.fileno(), sys.stdin.fileno())
-    os.dup2(stderr.fileno(), sys.stdout.fileno())
+    os.dup2(stdout.fileno(), sys.stdout.fileno())
     os.dup2(stderr.fileno(), sys.stderr.fileno())
 
     # Write PID file
@@ -114,6 +120,7 @@ def daemonize(pid_file=None):
 
     # Return the PID
     return os.getpid()
+
 
 def main():
     """

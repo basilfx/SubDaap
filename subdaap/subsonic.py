@@ -6,6 +6,7 @@ import utils
 # Logger instance
 logger = logging.getLogger(__name__)
 
+
 class Connection(libsonic.Connection):
     """
     Extend `libsonic.Connection` with new features and fix a few issues.

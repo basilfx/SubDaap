@@ -1,6 +1,5 @@
-from subdaap import database
-
 from daapserver import models
+
 
 class DatabaseCollection(models.Collection):
 
@@ -242,7 +241,7 @@ class DatabaseCollection(models.Collection):
                 yield value
 
 
-class Server(models.Server):
+class Server(models.BaseServer):
     """
     Database-aware Server object.
     """
@@ -270,7 +269,7 @@ class Server(models.Server):
                 """)
 
 
-class Database(models.Database):
+class Database(models.BaseDatabase):
     """
     Database-aware Database object.
     """
@@ -284,7 +283,7 @@ class Database(models.Database):
         self.db = db
 
 
-class Item(models.Item):
+class Item(models.BaseItem):
     """
     Database-aware Item object.
     """
@@ -306,7 +305,8 @@ class Item(models.Item):
                     `items`.`id` = ?
                 """, self.id)
 
-class Container(models.Container):
+
+class Container(models.BaseContainer):
     """
     Database-aware Container object.
     """
@@ -320,7 +320,7 @@ class Container(models.Container):
         self.db = db
 
 
-class ContainerItem(models.ContainerItem):
+class ContainerItem(models.BaseContainerItem):
     """
     Database-aware ContainerItem object.
     """

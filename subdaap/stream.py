@@ -1,12 +1,12 @@
 from daapserver.utils import parse_byte_range
 
-import os
 import shutil
 import gevent
 import gevent.queue
 
+
 def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
-    on_cache=None):
+                       on_cache=None):
     """
     Spawn a greenlet to download and cache a file, while simultaniously stream
     data to the receiver. An additional greenlet is spawned to handle the file
@@ -69,7 +69,8 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
         with lock:
             try:
                 for chunk_begin, chunk_end, chunk in _downloader():
-                    if (chunk_begin <= begin < chunk_end) or (chunk_begin <= end < chunk_end):
+                    if (chunk_begin <= begin < chunk_end) or \
+                            (chunk_begin <= end < chunk_end):
                         put = not put
 
                     if put:
@@ -91,7 +92,8 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
             put = False
 
             for chunk_begin, chunk_end, chunk in queue:
-                if (chunk_begin <= begin < chunk_end) or (chunk_begin <= end < chunk_end):
+                if (chunk_begin <= begin < chunk_end) or \
+                        (chunk_begin <= end < chunk_end):
                     put = not put
 
                 if put:
@@ -104,6 +106,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
             greenlet.kill()
 
     return _streamer
+
 
 def stream_from_file(lock, fd, file_size, on_start=None, on_finish=None):
     """
@@ -128,8 +131,9 @@ def stream_from_file(lock, fd, file_size, on_start=None, on_finish=None):
 
     return _streamer
 
+
 def stream_from_buffer(lock, data, file_size, chunk_size=8192, on_start=None,
-    on_finish=None):
+                       on_finish=None):
     """
     """
 

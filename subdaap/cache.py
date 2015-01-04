@@ -14,9 +14,12 @@ logger = logging.getLogger(__name__)
 # Time to wait for another item to finish, before failing.
 TIMEOUT_WAIT_FOR_READY = 60
 
+
 class FileCacheItem(object):
-    __slots__ = ("lock", "ready", "uses", "size", "type", "iterator", "data",
-        "permanent")
+    __slots__ = (
+        "lock", "ready", "uses", "size", "type", "iterator", "data",
+        "permanent"
+    )
 
     def __init__(self):
         self.lock = None
@@ -27,6 +30,7 @@ class FileCacheItem(object):
         self.iterator = None
         self.data = None
         self.permanent = False
+
 
 class FileCache(object):
     def __init__(self, directory, max_size, prune_threshold):
@@ -58,16 +62,18 @@ class FileCache(object):
         # Walk all files and sum their size
         for root, directories, files in os.walk(self.directory):
             if directories:
-                logger.warning("Found unexpected directories in cache " \
-                    "directory: %s", root)
+                logger.warning(
+                    "Found unexpected directories in cache directory: %s",
+                    root)
 
             for cache_file in files:
                 try:
                     cache_file = os.path.join(self.directory, cache_file)
                     cache_key = self.cache_file_to_cache_key(cache_file)
                 except ValueError:
-                    logger.warning("Found unexpected file in cache " \
-                        "directory: %s", cache_file)
+                    logger.warning(
+                        "Found unexpected file in cache directory: %s",
+                        cache_file)
                     continue
 
                 permanent = cache_key in permanent_cache_keys
@@ -84,7 +90,8 @@ class FileCache(object):
                 self.current_size += item.size
                 count += 1
 
-        logger.debug("%s: %d files in cache (%d permanent), size is %s/%s",
+        logger.debug(
+            "%s: %d files in cache (%d permanent), size is %s/%s",
             self.name, len(self.items), len(self.items) - count,
             utils.human_bytes(self.current_size),
             utils.human_bytes(self.max_size))
@@ -146,8 +153,8 @@ class FileCache(object):
         # Wait until the cache_item is ready for use, e.g. another request is
         # downloading the file.
         if wait_for_ready:
-            logger.debug("%s: waiting for item '%s' to be ready.",
-                self.name, cache_key)
+            logger.debug(
+                "%s: waiting for item '%s' to be ready.", self.name, cache_key)
 
             if not cache_item.ready.wait(timeout=TIMEOUT_WAIT_FOR_READY):
                 raise Exception("Waiting for cache item timed out.")
@@ -178,8 +185,8 @@ class FileCache(object):
         candidates = []
 
         for cache_key, cache_item in self.iteritems():
-            if self.current_size < (self.max_size *
-                (1.0 - self.prune_threshold)):
+            if self.current_size < \
+                    (self.max_size * (1.0 - self.prune_threshold)):
                 break
 
             if not cache_item.permanent or cache_item.uses == 0:
@@ -191,19 +198,21 @@ class FileCache(object):
         # Actual removal
         with self.items_lock:
             for cache_key, cache_item in candidates:
+                cache_file = self.cache_key_to_cache_file(cache_key)
                 self.unload(cache_key)
 
                 try:
-                    os.remove(self.cache_key_to_cache_file(cache_key))
+                    os.remove(cache_file)
                 except OSError as e:
-                    logger.warning("%s: unable to remove file '%s' from " \
-                        "cache: %s", self.name,
-                        os.path.basename(cache_file), e)
+                    logger.warning(
+                        "%s: unable to remove file '%s' from cache: %s",
+                        self.name, os.path.basename(cache_file), e)
 
                 del self.items[cache_key]
 
         if candidates:
-            logger.debug("%s: pruned %d/%d files, current size %s/%s.",
+            logger.debug(
+                "%s: pruned %d/%d files, current size %s/%s.",
                 self.name, len(candidates), len(self.items),
                 utils.human_bytes(self.current_size),
                 utils.human_bytes(self.max_size))
@@ -234,9 +243,10 @@ class FileCache(object):
     def update(self, cache_key, cache_item, cache_file, file_size):
         if cache_item.size != file_size:
             if cache_item.size:
-                logger.warning("%s: file size of item '%s' changed from %d " \
-                    "bytes to %d bytes while it was in cache.", self.name,
-                    cache_key, cache_item.size, file_size)
+                logger.warning(
+                    "%s: file size of item '%s' changed from %d bytes to %d "
+                    "bytes while it was in cache.", self.name, cache_key,
+                    cache_item.size, file_size)
 
             if not cache_item.permanent:
                 self.current_size -= cache_item.size
@@ -248,16 +258,17 @@ class FileCache(object):
         start = time.time()
 
         def on_cache(file_size):
-            logger.debug("%s: downloading '%s' took %.2f seconds.",
-                self.name, cache_key, time.time() - start)
+            logger.debug(
+                "%s: downloading '%s' took %.2f seconds.", self.name,
+                cache_key, time.time() - start)
 
             remote_fd.close()
             self.load(cache_key)
 
         cache_item = self.items[cache_key]
         cache_file = self.cache_key_to_cache_file(cache_key)
-        cache_item.iterator = stream.stream_from_remote(cache_item.lock,
-            remote_fd, cache_file, on_cache=on_cache)
+        cache_item.iterator = stream.stream_from_remote(
+            cache_item.lock, remote_fd, cache_file, on_cache=on_cache)
 
 
 class ArtworkCache(FileCache):
@@ -267,12 +278,14 @@ class ArtworkCache(FileCache):
 
         def on_start():
             cache_item.uses += 1
-            logger.debug("%s: incremented '%s' use to %d", self.name, cache_key,
+            logger.debug(
+                "%s: incremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         def on_finish():
             cache_item.uses -= 1
-            logger.debug("%s: decremented '%s' use to %d", self.name, cache_key,
+            logger.debug(
+                "%s: decremented '%s' use to %d", self.name, cache_key,
                 cache_item.uses)
 
         file_size = os.stat(cache_file).st_size
@@ -281,8 +294,9 @@ class ArtworkCache(FileCache):
         # Update cache item
         self.update(cache_key, cache_item, cache_file, file_size)
 
-        cache_item.iterator = stream.stream_from_file(cache_item.lock,
-            local_fd, file_size, on_start=on_start, on_finish=on_finish)
+        cache_item.iterator = stream.stream_from_file(
+            cache_item.lock, local_fd, file_size,
+            on_start=on_start, on_finish=on_finish)
         cache_item.ready.set()
 
     def unload(self, cache_key):
@@ -292,6 +306,7 @@ class ArtworkCache(FileCache):
             cache_item.data.close()
             cache_item.data = None
 
+
 class ItemCache(FileCache):
 
     def load(self, cache_key):
@@ -300,13 +315,15 @@ class ItemCache(FileCache):
 
         def on_start():
             cache_item.uses += 1
-            logger.debug("%s: incremented '%s' use to %d.",
-                self.name, cache_key, cache_item.uses)
+            logger.debug(
+                "%s: incremented '%s' use to %d.", self.name, cache_key,
+                cache_item.uses)
 
         def on_finish():
             cache_item.uses -= 1
-            logger.debug("%s: decremented '%s' use to %d.",
-                self.name, cache_key, cache_item.uses)
+            logger.debug(
+                "%s: decremented '%s' use to %d.", self.name, cache_key,
+                cache_item.uses)
 
         file_size = os.stat(cache_file).st_size
 
@@ -317,8 +334,9 @@ class ItemCache(FileCache):
         # Update cache item
         self.update(cache_key, cache_item, cache_file, file_size)
 
-        cache_item.iterator = stream.stream_from_buffer(cache_item.lock,
-            mmap_fd, file_size, on_start=on_start, on_finish=on_finish)
+        cache_item.iterator = stream.stream_from_buffer(
+            cache_item.lock, mmap_fd, file_size,
+            on_start=on_start, on_finish=on_finish)
         cache_item.ready.set()
 
     def unload(self, cache_key):
