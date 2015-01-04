@@ -22,6 +22,10 @@ username = TODO
 # Password
 password = TODO
 
+# Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
+# 'all'.
+# transcode = unsupported
+
 
 [Daap]
 

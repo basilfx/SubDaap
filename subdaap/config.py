@@ -10,8 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Config file specification
 CONFIG_VERSION = 1
-CONFIG_SPEC = \
-"""
+CONFIG_SPEC = """
 version = integer(min=1, default=%d)
 
 [SubSonic]
@@ -45,6 +44,7 @@ item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
 """ % CONFIG_VERSION
 
+
 def get_config(config_file):
     """
     Parse the config file, validate it and convert types. Return a dictionary
@@ -57,6 +57,12 @@ def get_config(config_file):
 
     # Convert types and validate file
     config.validate(validator, preserve_errors=True, copy=True)
-    logger.info("Config file version %d", config["version"])
+    logger.debug("Config file version %d", config["version"])
+
+    # For now, no automatic update support.
+    if config["version"] != CONFIG_VERSION:
+        logger.warning(
+            "Config file version is %d, while expected version is %d. Please "
+            "check for inconsistencies.", config["version"], CONFIG_VERSION)
 
     return config
