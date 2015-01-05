@@ -18,7 +18,8 @@ class Database(object):
         self.lock = lock.RLock()
 
         logger.info("Loading database from %s.", database_file)
-        self.connection = sqlite3.connect(database_file)
+        self.connection = sqlite3.connect(database_file,
+            check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
 
     @contextmanager
