@@ -70,13 +70,23 @@ class Connection(libsonic.Connection):
                 yield playlist
 
         response = super(Connection, self).getPlaylists(*args, **kwargs)
-        response["playlists"]["playlist"] = list(_playlists_iterator(
-            response["playlists"].get("playlist")))
+        response["playlists"]["playlist"] = list(
+            _playlists_iterator(response["playlists"].get("playlist")))
 
         return response
 
     def getPlaylist(self, *args, **kwargs):
+        """
+        """
+
+        def _entries_iterator(entries):
+            for entry in utils.force_list(entries):
+                entry["id"] = int(entry["id"])
+                yield entry
+
         response = super(Connection, self).getPlaylist(*args, **kwargs)
+        response["playlist"]["entry"] = list(
+            _entries_iterator(response["playlist"].get("entry")))
 
         return response
 

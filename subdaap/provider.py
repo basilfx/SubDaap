@@ -36,6 +36,7 @@ class SubSonicProvider(provider.Provider):
         self.item_cache = item_cache
         self.state_file = state_file
         self.transcode = transcode
+        self.transcode_unsupported = transcode_unsupported
 
         self.lock = gevent.lock.Semaphore()
         self.ready = gevent.event.Event()
@@ -269,7 +270,7 @@ class Synchronizer(object):
             logger.info("Remote playlists changed")
             changed = True
 
-        self.sync_playlists()
+            self.sync_playlists()
 
         # Store version numbers
         if changed:
@@ -650,11 +651,11 @@ class Synchronizer(object):
                     try:
                         item_album_id = local_albums[item["albumId"]][1]
                     except KeyError:
-                        item_artist_id = None
+                        item_album_id = None
                     try:
                         item_duration = item["duration"] * 1000
                     except KeyError:
-                        item_artist_id = None
+                        item_duration = None
 
                     # Check if item has changed
                     if remote_item_id not in local_items:
@@ -850,7 +851,8 @@ class Synchronizer(object):
                 if remote_container_id not in added_containers:
                     container_checksum = utils.dict_checksum({
                         "is_base": 0,
-                        "name": container["name"]
+                        "name": container["name"],
+                        "songCount": container["songCount"]
                     })
 
                     # Check if container has changed
@@ -869,7 +871,7 @@ class Synchronizer(object):
                             VALUES
                                (?, ?, ?, ?, ?, ?, ?, ?)
                             """,
-                            utils.generate_persistent_id(),
+                            generate_persistent_id(),
                             self.database_id,
                             container_id,
                             container["name"],
@@ -887,14 +889,20 @@ class Synchronizer(object):
                             UPDATE
                                 `containers`
                             SET
-                                `containers`.`name` = ?,
-                                `containers`.`checksum` = ?
+                                `name` = ?,
+                                `checksum` = ?
                             WHERE
                                 `containers`.`id` = ?
                             """,
                             container["name"],
                             container_checksum,
                             local_containers[remote_container_id][1])
+
+                    # Sync playlist items
+                    self.sync_playlist_items(
+                        container,
+                        local_containers[remote_container_id][1],
+                        cursor)
 
                     # Mark as added/edited, so it won't be processed again
                     added_containers.add(remote_container_id)
@@ -913,8 +921,55 @@ class Synchronizer(object):
 
             return added_containers, deleted_containers
 
-    def sync_playlist_items(self, playlist, container):
-        pass
+    def sync_playlist_items(self, playlist, container_id, cursor):
+        """
+        """
+
+        database_id = self.database_id
+
+        cursor.query(
+            """
+            DELETE FROM
+                `container_items`
+            WHERE
+                `container_items`.`container_id` = ? AND
+                `container_items`.`database_id` = ?
+            """, container_id, database_id)
+
+        remote_items = set()
+
+        for entry in self.walk_playlist_entries(playlist["id"]):
+            remote_items.add(entry["id"])
+
+        local_items = cursor.query_dict(
+            """
+            SELECT
+                `items`.`remote_id`,
+                `items`.`id`
+            FROM
+                `items`
+            WHERE
+                `items`.`remote_id` IN (%s) AND
+                `items`.`database_id` = ?
+            """ % utils.in_list(set(remote_items)), database_id)
+
+        for entry in self.walk_playlist_entries(playlist["id"]):
+            cursor.query(
+                """
+                INSERT INTO `container_items` (
+                    `persistent_id`,
+                    `database_id`,
+                    `container_id`,
+                    `item_id`,
+                    `order`)
+                VALUES
+                    (?, ?, ?, ?, ?)
+                """,
+                generate_persistent_id(),
+                database_id,
+                container_id,
+                local_items[entry["id"]][0],
+                entry["order"])
 
     def walk_index(self):
         """
@@ -939,15 +994,16 @@ class Synchronizer(object):
         for child in response["playlists"]["playlist"]:
             yield child
 
-    def walk_playlist_items(self, playlist):
+    def walk_playlist_entries(self, playlist_id):
         """
         Request SubSonic's playlist items and iterate each item.
         """
 
-        for order, child in enumerate(
-                utils.force_list(playlist["entry"]), start=1):
-            child["order"] = order
+        response = self.cache.get("playlist_%d" % playlist_id) or \
+            self.connection.getPlaylist(playlist_id)
 
+        for order, child in enumerate(response["playlist"]["entry"], start=1):
+            child["order"] = order
             yield child
 
     def walk_directory(self, directory_id):
