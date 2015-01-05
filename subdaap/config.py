@@ -29,7 +29,7 @@ password = string(default="")
 zeroconf = boolean(default=True)
 
 [Provider]
-database = string
+database = string(default="./database.db")
 
 artwork = boolean(default=True)
 artwork cache = boolean(default=True)

@@ -3,6 +3,10 @@ from contextlib import contextmanager
 from gevent import lock
 
 import sqlite3
+import logging
+
+# Logger instance
+logger = logging.getLogger(__name__)
 
 
 class Database(object):
@@ -13,6 +17,7 @@ class Database(object):
     def __init__(self, database_file):
         self.lock = lock.RLock()
 
+        logger.info("Loading database from %s.", database_file)
         self.connection = sqlite3.connect(database_file)
         self.connection.row_factory = sqlite3.Row
 

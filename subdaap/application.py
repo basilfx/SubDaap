@@ -1,4 +1,4 @@
-from subdaap import provider, config, database, cache, subsonic, webserver
+from subdaap import provider, config, database, cache, webserver
 
 from daapserver import DaapServer
 
@@ -43,15 +43,18 @@ class Application(object):
         Setup the database connection, the SubSonic connection and provider.
         """
 
-        # Initialize connections
+        # Initialize database
+        db = database.Database(self.config["Provider"]["database"])
+
+        # Initialize connections. Subsonic is imported here, because it somehow
+        # causes Python to crash when it's opening a database.
+        from subdaap import subsonic
+
         connections = {}
 
         for name, config in self.config["SubSonic"].iteritems():
             connections[config["index"]] = subsonic.Connection(
                 name, config["url"], config["username"], config["password"])
-
-        # Initialize database
-        db = database.Database(self.config["Provider"]["database"])
 
         # Initialize cache
         artwork_cache_dir = self.get_cache_dir(

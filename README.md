@@ -20,8 +20,8 @@ This project is an early and experiomental version. I use it for my personal lib
 ## Installation
 This application was designed as a gateway between SubSonic and iTunes. Therefore, it's recommended to install this on the same system where you would access iTunes on. It can be installed on a central server, however.
 
-* Clone this repository
-* Install dependencies via `pip install -r requirements.txt`
+* Clone this repository.
+* Install dependencies via `pip install -r requirements.txt`.
 * Copy `config.ini.default` to `config.ini` and edit as desired.
 * `chmod 700 config.ini`, so others cannot view your credentials!
 
@@ -36,7 +36,6 @@ The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for
 more verbose.
 
 ## Known issues
-* SQLite doesn't work when application runs as daemon.
 * Gevent may throw `Broken Pipe' exceptions. This is a known issue but can be ignored. See https://github.com/surfly/gevent/pull/377 for more information.
 
 ## License

@@ -1,12 +1,14 @@
 from gevent import monkey; monkey.patch_all()
 
-from subdaap.utils import VerboseAction, PathAction, NewPathAction
 from subdaap.application import Application
+
+from subdaap.utils import VerboseAction, PathAction, NewPathAction
 
 import argparse
 import logging
 import atexit
 import sys
+import gc
 import os
 
 # Logger instance
@@ -77,12 +79,15 @@ def daemonize(pid_file=None):
 
     # Dependency check to make sure the imports are OK. Saves you from a lot of
     # debugging trouble.
-    assert atexit.register and os.fork and sys.stdout
+    assert atexit.register and os.fork and sys.stdout and gc.collect
+
+    # Cleanup old resources to minimize the risk of sharing.
+    gc.collect()
 
     # First fork
     try:
         if os.fork() > 0:
-            sys.exit(0)
+            os._exit(0)
     except OSError as e:
         sys.stderr.write("Unable to fork: %d (%s)\n" % (e.errno, e.strerror))
         sys.exit(1)
@@ -94,7 +99,7 @@ def daemonize(pid_file=None):
     # Second fork
     try:
         if os.fork() > 0:
-            sys.exit(0)
+            os._exit(0)
     except OSError as e:
         sys.stderr.write("Unable to fork: %d (%s)\n" % (e.errno, e.strerror))
         sys.exit(1)
