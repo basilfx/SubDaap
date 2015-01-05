@@ -6,12 +6,9 @@ version = 2
 # You can define multiple SubSonic libraries here. Each connection will be
 # considered as a separate database. Altough the DAAP protocol supports multiple
 # databases, iTunes only supports one library. The name of the key defines it's
-# name.
+# name. The order is important, so don't move sections around!
 
 [[ My SubSonic Library ]]
-
-# Local database index mapping. Should be unique.
-index = 1
 
 # Remote server host (e.g. http://host:port/)
 url = TODO
@@ -86,5 +83,6 @@ item cache size = 10240
 # 'all'.
 # item transcode = unsupported
 
-# List of unsupported file suffixes (default is 'flac').
+# List of unsupported file suffixes (default is 'flac'). In case of no items or
+# single item, end with a comma.
 # item transcode unsupported = flac, alac, m4a

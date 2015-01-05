@@ -14,8 +14,6 @@ import cPickle
 # Logger instance
 logger = logging.getLogger(__name__)
 
-TRANSCODE_UNSUPPORTED = ["flac"]
-
 
 class SubSonicProvider(provider.Provider):
 
@@ -24,7 +22,7 @@ class SubSonicProvider(provider.Provider):
     supports_persistent_id = True
 
     def __init__(self, db, connections, artwork_cache, item_cache, state_file,
-                 transcode):
+                 transcode, transcode_unsupported):
         """
         """
 
@@ -143,8 +141,6 @@ class SubSonicProvider(provider.Provider):
                     changed = True
 
         if changed:
-            initial = False
-
             self.save_state()
 
             self.ready.set()
@@ -184,11 +180,18 @@ class SubSonicProvider(provider.Provider):
 
     def get_item_fd(self, database_id, remote_id, file_suffix):
         """
+        Get a file descriptor of remote connection, based on transcoding
+        settings.
         """
 
-        if self.transcode == "all" or (self.transcode == "unsupported" and
-                file_suffix in TRANSCODE_UNSUPPORTED):
-            logger.debug("Transcoding item '%i'.", remote_id)
+        needs_transcoding = self.transcode == "all" or (
+            self.transcode == "unsupported" and
+            file_suffix in self.transcode_unsupported)
+
+        if needs_transcoding:
+            logger.debug(
+                "Transcoding item '%d' with file suffix '%s'.",
+                remote_id, file_suffix)
             return self.connections[database_id].stream(
                 remote_id, tformat="mp3")
         else:

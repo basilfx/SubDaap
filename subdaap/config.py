@@ -1,6 +1,6 @@
 from cStringIO import StringIO
 
-from configobj import ConfigObj
+from configobj import ConfigObj, flatten_errors
 from validate import Validator
 
 import logging
@@ -16,7 +16,6 @@ version = integer(min=1, default=%d)
 [SubSonic]
 
 [[__many__]]
-index = integer(min=1, default=1)
 url = string
 username = string
 password = string
@@ -45,7 +44,7 @@ item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
 
 item transcode = option("no", "unsupported", "all", default="no")
-item transcode unsupported = list(default="flac")
+item transcode unsupported = list(default=list("flac"))
 """ % CONFIG_VERSION
 
 
@@ -57,16 +56,34 @@ def get_config(config_file):
 
     specs = ConfigObj(StringIO(CONFIG_SPEC), list_values=False)
     config = ConfigObj(config_file, configspec=specs)
+
+    # Create validator
     validator = Validator()
 
     # Convert types and validate file
-    config.validate(validator, preserve_errors=True, copy=True)
+    result = config.validate(validator, preserve_errors=True, copy=True)
     logger.debug("Config file version %d", config["version"])
+
+    # Raise exceptions for errors
+    for section_list, key, message in flatten_errors(config, result):
+        if key is not None:
+            raise ValueError(
+                "The '%s' key in the section '%s' failed validation: %s" % (
+                    key, ", ".join(section_list), message))
+        else:
+            raise ValueError(
+                "The following section was missing: %s." % (
+                    ", ".join(section_list)))
+
+    # Post-process values
+    config["Provider"]["item transcode unsupported"] = [
+        x.lower() for x in config["Provider"]["item transcode unsupported"]]
 
     # For now, no automatic update support.
     if config["version"] != CONFIG_VERSION:
         logger.warning(
             "Config file version is %d, while expected version is %d. Please "
-            "check for inconsistencies.", config["version"], CONFIG_VERSION)
+            "check for inconsistencies and update manually.",
+            config["version"], CONFIG_VERSION)
 
     return config

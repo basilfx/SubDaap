@@ -43,18 +43,19 @@ class Application(object):
         Setup the database connection, the SubSonic connection and provider.
         """
 
+        # Subsonic is imported here, because it somehow causes Python to crash
+        # after a fork, when it's opening a database.
+        from subdaap import subsonic
+
         # Initialize database
         db = database.Database(self.config["Provider"]["database"])
 
-        # Initialize connections. Subsonic is imported here, because it somehow
-        # causes Python to crash when it's opening a database.
-        from subdaap import subsonic
-
+        # Initialize connections.
         connections = {}
 
-        for name, config in self.config["SubSonic"].iteritems():
-            connections[config["index"]] = subsonic.Connection(
-                name, config["url"], config["username"], config["password"])
+        for name, section in self.config["SubSonic"].iteritems():
+            connections[len(connections) + 1] = subsonic.Connection(
+                name, section["url"], section["username"], section["password"])
 
         # Initialize cache
         artwork_cache_dir = self.get_cache_dir(
@@ -74,11 +75,14 @@ class Application(object):
         logger.debug(
             "Setting up Provider with %d connections", len(connections))
 
-        state_file = os.path.join(self.get_cache_dir(), "provider.state")
         self.provider = provider.SubSonicProvider(
-            db=db, connections=connections, artwork_cache=artwork_cache,
-            item_cache=item_cache, state_file=state_file,
-            transcode=self.config["Provider"]["item transcode"])
+            db=db,
+            connections=connections,
+            artwork_cache=artwork_cache,
+            item_cache=item_cache,
+            state_file=os.path.join(self.get_cache_dir(), "provider.state"),
+            transcode=self.config["Provider"]["item transcode"],
+            transcode_unsupported=self.config["Provider"]["item transcode"])
 
     def setup_server(self):
         """
@@ -95,7 +99,8 @@ class Application(object):
             password=self.config["Daap"]["password"],
             ip=self.config["Daap"]["interface"],
             port=self.config["Daap"]["port"],
-            cache=True,
+            cache=self.config["Daap"]["cache"],
+            cache_timeout=self.config["Daap"]["cache timeout"] * 60,
             bonjour=self.config["Daap"]["zeroconf"],
             debug=self.verbose > 1)
 
