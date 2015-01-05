@@ -1,4 +1,4 @@
-from subdaap import monkey; monkey.patch_all() # noqa
+from subdaap import monkey # noqa
 
 from subdaap.application import Application
 
