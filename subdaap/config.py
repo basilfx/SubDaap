@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Config file specification
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 CONFIG_SPEC = """
 version = integer(min=1, default=%d)
 
@@ -27,6 +27,8 @@ interface = string(default="0.0.0.0")
 port = integer(min=1, max=65535, default=3689)
 password = string(default="")
 zeroconf = boolean(default=True)
+cache = boolean(default=True)
+cache timeout = integer(min=1, default=1440)
 
 [Provider]
 database = string(default="./database.db")
@@ -43,6 +45,7 @@ item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
 
 item transcode = option("no", "unsupported", "all", default="no")
+item transcode unsupported = list(default="flac")
 """ % CONFIG_VERSION
 
 

@@ -1,5 +1,5 @@
 # Paths and files are relative to the data directory!
-
+version = 2
 
 [SubSonic]
 
@@ -40,6 +40,12 @@ name = SubDaap Library
 # To advertise server via Bonjour (default is yes).
 # zeroconf = no
 
+# Cache DAAP responses to speed up future access (default is yes).
+# cache = no
+
+# DAAP response cache timeout in minutes (default is 1440, one day).
+# cache timeout = 2880
+
 
 [Provider]
 
@@ -79,3 +85,6 @@ item cache size = 10240
 # Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
 # 'all'.
 # item transcode = unsupported
+
+# List of unsupported file suffixes (default is 'flac').
+# item transcode unsupported = flac, alac, m4a
