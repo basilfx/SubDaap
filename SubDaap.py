@@ -1,4 +1,4 @@
-from gevent import monkey; monkey.patch_all()
+from subdaap import monkey; monkey.patch_all() # noqa
 
 from subdaap.application import Application
 
@@ -43,7 +43,7 @@ def parse_arguments():
     return parser.parse_args(), parser
 
 
-def setup_logging(console=True, logfile=False, verbose=False):
+def setup_logging(console=True, log_file=False, verbose=False):
     """
     """
 
@@ -60,8 +60,8 @@ def setup_logging(console=True, logfile=False, verbose=False):
         logging.getLogger().addHandler(console_log_handler)
 
     # Add file output
-    if logfile:
-        file_log_handler = logging.FileHandler(logfile)
+    if log_file:
+        file_log_handler = logging.FileHandler(log_file)
         file_log_handler.setLevel(level)
         file_log_handler.setFormatter(formatter)
         logging.getLogger().addHandler(file_log_handler)
