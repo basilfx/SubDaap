@@ -2,22 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
     <dict>
-        <key>Label</key>
+        <key>Disabled</key>
+        <false/>
+        <key>KeepAlive</key>
+        <true/>
         <string>com.basilfx.subdaap</string>
         <key>ProgramArguments</key>
         <array>
             <!-- <string>/usr/bin/pypy</string> -->
             <string>/usr/bin/python</string>
-            <string>/Applications/SubDaap/SubDaap.py</string>
-            <string>--config-file</string>
-            <string>~/Library/Application Support/SubDaap/config.ini</string>
+            <string>SubDaap.py</string>
             <string>--data-dir</string>
             <string>~/Library/Application Support/SubDaap/</string>
-            <string>--log</string>
+            <string>--config-file</string>
+            <string>~/Library/Application Support/SubDaap/config.ini</string>
+            <string>--pid-file</string>
+            <string>~/Library/Application Support/SubDaap/subdaap.pid</string>
+            <string>--log-file</string>
             <string>~/Library/Application Support/SubDaap/subdaap.log</string>
             <string>--daemon</string>
         </array>
         <key>RunAtLoad</key>
         <true/>
+        <key>WorkingDirectory</key>
+        <string>/Applications/SubDaap</string>
     </dict>
 </plist>
