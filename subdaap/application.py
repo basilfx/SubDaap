@@ -82,7 +82,8 @@ class Application(object):
             item_cache=item_cache,
             state_file=os.path.join(self.get_cache_dir(), "provider.state"),
             transcode=self.config["Provider"]["item transcode"],
-            transcode_unsupported=self.config["Provider"]["item transcode"])
+            transcode_unsupported=self.config["Provider"][
+                "item transcode unsupported"])
 
     def setup_server(self):
         """
