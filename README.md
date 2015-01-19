@@ -16,6 +16,7 @@ This project is an early and experiomental version. I use it for my personal lib
 
 ## Requirements
 * Python 2.7+. PyPy 2.4 works and is a lot faster.
+* SubSonic 4.9+
 
 ## Installation
 This application was designed as a gateway between SubSonic and iTunes. Therefore, it's recommended to install this on the same system where you would access iTunes on. It can be installed on a central server, however.
@@ -32,8 +33,7 @@ To run the application, use the following command, or similar:
 python SubDaap.py --daemon --config config.ini --data-dir path/to/datadir --pid-file /var/run/subdaap.pid
 ```
 
-The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for
-more verbose.
+The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for more verbose. All paths in the command line are relative to where you run it from.
 
 ## Known issues
 * Gevent may throw `Broken Pipe' exceptions. This is a known issue but can be ignored. See https://github.com/surfly/gevent/pull/377 for more information.
