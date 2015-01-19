@@ -388,8 +388,8 @@ class Synchronizer(object):
                     UPDATE
                         `databases`
                     SET
-                        `databases`.`name` = ?,
-                        `databases`.`checksum` = ?
+                        `name` = ?,
+                        `checksum` = ?
                     WHERE
                         `databases`.`id` = ?
                     """,
@@ -571,8 +571,8 @@ class Synchronizer(object):
                                 UPDATE
                                     `artists`
                                 SET
-                                    `artists`.`name` = ?,
-                                    `artists`.`checksum` = ?
+                                    `name` = ?,
+                                    `checksum` = ?
                                 WHERE
                                     `artists`.`id` = ?
                                 """,
@@ -623,9 +623,9 @@ class Synchronizer(object):
                                         UPDATE
                                             `albums`
                                         SET
-                                           `albums`.`name` = ?,
-                                           `albums`.`art` = ?,
-                                           `albums`.`checksum` = ?
+                                           `name` = ?,
+                                           `art` = ?,
+                                           `checksum` = ?
                                         WHERE
                                             `albums`.`id` = ?
                                         """,
@@ -707,19 +707,19 @@ class Synchronizer(object):
                             UPDATE
                                 `items`
                             SET
-                                `items`.`artist_id` = ?,
-                                `items`.`album_id` = ?,
-                                `items`.`name` = ?,
-                                `items`.`genre` = ?,
-                                `items`.`year` = ?,
-                                `items`.`track` = ?,
-                                `items`.`duration` = ?,
-                                `items`.`bitrate` = ?,
-                                `items`.`file_name` = ?,
-                                `items`.`file_type,` = ?,
-                                `items`.`file_suffix` = ?,
-                                `items`.`file_size` = ?,
-                                `items`.`checksum` = ?)
+                                `artist_id` = ?,
+                                `album_id` = ?,
+                                `name` = ?,
+                                `genre` = ?,
+                                `year` = ?,
+                                `track` = ?,
+                                `duration` = ?,
+                                `bitrate` = ?,
+                                `file_name` = ?,
+                                `file_type` = ?,
+                                `file_suffix` = ?,
+                                `file_size` = ?,
+                                `checksum` = ?
                             WHERE
                                 `items`.`id` = ?
                             """,
