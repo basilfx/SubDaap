@@ -44,6 +44,11 @@ class SubSonicProvider(provider.Provider):
         self.setup_state()
         self.setup_library()
 
+        # For some reason iTunes 12.1 does not work when the revision is equal
+        # to 1. Therefore, it is increased to two (as if the data is loaded).
+        self.server.storage.commit()
+        self.server.storage.revision = 2
+
     def wait_for_update(self):
         """
         """
@@ -110,7 +115,7 @@ class SubSonicProvider(provider.Provider):
                             remote_id)
                         self.artwork_cache.download(local_id, remote_fd)
 
-                        # Exhaust iterator so it actually downloads
+                        # Exhaust iterator so it actually downloads the item.
                         utils.exhaust(cache_item.iterator())
                     self.artwork_cache.unload(local_id)
 
@@ -123,7 +128,7 @@ class SubSonicProvider(provider.Provider):
                             database_id, remote_id, file_suffix)
                         self.item_cache.download(local_id, remote_fd)
 
-                        # Exhaust iterator so it actually downloads
+                        # Exhaust iterator so it actually downloads the item.
                         utils.exhaust(cache_item.iterator())
                     self.item_cache.unload(local_id)
 
