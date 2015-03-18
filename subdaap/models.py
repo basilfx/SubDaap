@@ -35,8 +35,8 @@ class DatabaseCollection(models.Collection):
                 WHERE
                     `items`.`database_id` = ? AND
                     `items`.`exclude` = 0 AND
-                    `artists`.`exclude` = 0 AND
-                    `albums`.`exclude` = 0
+                    COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`albums`.`exclude`, 0) = 0
                 LIMIT 1
                 """, self.parent.id)
         elif self.key == models.KEY_CONTAINERS:
@@ -56,9 +56,18 @@ class DatabaseCollection(models.Collection):
                     COUNT(*)
                 FROM
                     `container_items`
+                INNER JOIN
+                    `items` ON `container_items`.`id`=`items`.`id`
+                LEFT OUTER JOIN
+                    `artists` ON `items`.`artist_id`=`artists`.`id`
+                LEFT OUTER JOIN
+                    `albums` ON `items`.`album_id`=`albums`.`id`
                 WHERE
+                    `container_items`.`database_id` = ? AND
                     `container_items`.`container_id` = ? AND
-                    `container_items`.`database_id` = ?
+                    COALESCE(`items`.`exclude`, 0) = 0 AND
+                    COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`albums`.`exclude`, 0) = 0
                 LIMIT 1
                 """, self.parent.id, self.parent.database_id)
 
@@ -114,8 +123,8 @@ class DatabaseCollection(models.Collection):
                     WHERE
                         `items`.`database_id` = ? AND
                         `items`.`exclude` = 0 AND
-                        `artists`.`exclude` = 0 AND
-                        `albums`.`exclude` = 0
+                        COALESCE(`artists`.`exclude`, 0) = 0 AND
+                        COALESCE(`albums`.`exclude`, 0) = 0
                     """, self.parent.id)
             elif self.key == models.KEY_CONTAINERS:
                 clazz = Container
@@ -143,9 +152,18 @@ class DatabaseCollection(models.Collection):
                         `container_items`.`container_id`
                     FROM
                         `container_items`
+                    INNER JOIN
+                        `items` ON `container_items`.`id`=`items`.`id`
+                    LEFT OUTER JOIN
+                        `artists` ON `items`.`artist_id`=`artists`.`id`
+                    LEFT OUTER JOIN
+                        `albums` ON `items`.`album_id`=`albums`.`id`
                     WHERE
+                        `container_items`.`database_id` = ? AND
                         `container_items`.`container_id` = ? AND
-                        `container_items`.`database_id` = ?
+                        COALESCE(`items`.`exclude`, 0) = 0 AND
+                        COALESCE(`artists`.`exclude`, 0) = 0 AND
+                        COALESCE(`albums`.`exclude`, 0) = 0
                     """, self.parent.id, self.parent.database_id)
 
             # Convert rows to items
