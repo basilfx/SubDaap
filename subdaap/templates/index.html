@@ -7,12 +7,60 @@
         <!-- CSS -->
         <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
 
+        <style type="text/css">
+            .text-xsmall {
+                font-size: 70%;
+            }
+
+            .button-success,
+            .button-error,
+            .button-warning,
+            .button-secondary {
+                color: white;
+                border-radius: 4px;
+                text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+            }
+
+            .button-success {
+                background: rgb(28, 184, 65); /* this is a green */
+            }
+
+            .button-error {
+                background: rgb(202, 60, 60); /* this is a maroon */
+            }
+
+            .button-warning {
+                background: rgb(223, 117, 20); /* this is an orange */
+            }
+
+            .button-secondary {
+                background: rgb(66, 184, 221); /* this is a light blue */
+            }
+
+            hr#footer {
+                margin-top: 30px;
+                color: "grey"
+            }
+
+            div#container {
+                max-width: 1040px;
+                padding-left: 15px;
+                padding-right: 15px;
+                margin: auto;
+            }
+        </style>
+
         <!-- Meta tags -->
         <meta name="viewport" content="width=device-width, initial-scale=1">
     </head>
     <body>
-        <div style="max-width: 1040px; padding-left: 15px; padding-right: 15px; margin: auto">
+        <div id="container">
             <h1>{{ application.server.server_name }}</h1>
+
+            <h2>Actions</h2>
+
+            <a class="pure-button button-error text-xsmall" href="/actions/shutdown">Shutdown</a>
+            <a class="pure-button button-success text-xsmall" href="/actions/synchronize">Synchronize</a>
 
             <h2>Server statistics</h2>
 
@@ -95,11 +143,11 @@
             <h2>Cached items</h2>
 
             <p>
-                Current size is of item cache is {{ application.provider.item_cache.current_size|human_bytes }} of
-                {{ application.provider.item_cache.max_size|human_bytes }} and the
+                Current size of the item cache is {{ application.provider.item_cache.current_size|human_bytes }} of
+                {{ application.provider.item_cache.max_size|human_bytes }} ({{ application.provider.item_cache.items|length }} items)  and the
                 current size of the artwork cache is {{ application.provider.artwork_cache.current_size|human_bytes }}
-                of {{ application.provider.artwork_cache.max_size|human_bytes }}. The list below shows current items
-                that are in use.
+                of {{ application.provider.artwork_cache.max_size|human_bytes }} ({{ application.provider.artwork_cache.items|length }} images).
+                The list below shows current items that are in use.
             </p>
 
             <table class="pure-table">
@@ -128,6 +176,12 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            <hr id="footer">
+
+            <p class="text-xsmall">
+                SubDaap v1.0 by BasilFX. <a href="https://www.github.com/basilfx/SubDaap">Github</a> project page.
+            </p>
         </div>
     </body>
 </html>

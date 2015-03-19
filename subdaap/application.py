@@ -124,7 +124,7 @@ class Application(object):
         """
         Stop the server.
         """
-        pass
+        self.server.stop()
 
     def get_cache_dir(self, *path):
         """
