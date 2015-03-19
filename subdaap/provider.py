@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 
 class SubSonicProvider(provider.Provider):
 
+    # SubSonic has support for artwork
     supports_artwork = True
 
+    # Persistent IDs are supported.
     supports_persistent_id = True
 
     def __init__(self, db, connections, artwork_cache, item_cache, state_file,
@@ -44,13 +46,16 @@ class SubSonicProvider(provider.Provider):
         self.setup_state()
         self.setup_library()
 
-        # For some reason iTunes 12.1 does not work when the revision is equal
-        # to 1. Therefore, it is increased to two (as if the data is loaded).
+        # iTunes 12.1 doesn't work when the revision number is one. Since this
+        # provider loads the data directly from the database, the revision
+        # number doesn't change. Therefore, increase the revision number by
+        # committing.
         self.server.storage.commit()
-        self.server.storage.revision = 2
 
     def wait_for_update(self):
         """
+        Block the serving greenlet until a new revision is available, e.g. the
+        ready event is set.
         """
 
         # Block until next upate
