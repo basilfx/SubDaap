@@ -94,6 +94,14 @@
 
             <h2>Cached items</h2>
 
+            <p>
+                Current size is of item cache is {{ application.provider.item_cache.current_size|human_bytes }} of
+                {{ application.provider.item_cache.max_size|human_bytes }} and the
+                current size of the artwork cache is {{ application.provider.artwork_cache.current_size|human_bytes }}
+                of {{ application.provider.artwork_cache.max_size|human_bytes }}. The list below shows current items
+                that are in use.
+            </p>
+
             <table class="pure-table">
                 <thead>
                     <tr>
