@@ -3,7 +3,7 @@ from gevent.monkey import patch_all
 
 def patch_pypy():
     """
-    Monkey patch PyPy so it SubDaap runs better.
+    Monkey patch PyPy so SubDaap works.
     """
 
     # Check if running under PyPY
@@ -19,8 +19,9 @@ def patch_pypy():
     if not hasattr(Semaphore, "_py3k_acquire"):
         Semaphore._py3k_acquire = Semaphore.acquire
 
-    # Patch for Sqlite3 threading issue. Since SubDaap uses microthreads and
-    # no actual threads, disable the warning. This only happens with PyPy.
+    # Patch for Sqlite3 threading issue. Since SubDaap uses greenlets
+    # (microthreads) and no actual threads, disable the warning. This only
+    # happens with PyPy.
     import sqlite3
 
     old_connect = sqlite3.connect
