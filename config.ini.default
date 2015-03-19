@@ -31,11 +31,11 @@ name = SubDaap Library
 # Server port (default is 3689, may conflict with iTunes Home Sharing).
 # port = 3688
 
-# Enable web interface on the same port (default is yes).
-# web interface = no
-
 # Server password (default is no password).
 # password = MyPassword
+
+# Enable web interface. Uses same password if enabled. (default is yes).
+# web interface = no
 
 # To advertise server via Bonjour (default is yes).
 # zeroconf = no
