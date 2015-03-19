@@ -3,94 +3,123 @@
 <html>
     <head>
         <title>SubDaap</title>
+
+        <!-- CSS -->
+        <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+
+        <!-- Meta tags -->
+        <meta name="viewport" content="width=device-width, initial-scale=1">
     </head>
     <body>
-        <h1>Server statistics</h1>
+        <div style="max-width: 1040px; padding-left: 15px; padding-right: 15px; margin: auto">
+            <h1>{{ application.server.server_name }}</h1>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Items</th>
-                    <th>Containers</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for database in application.provider.server.databases.itervalues() %}
+            <h2>Server statistics</h2>
+
+            <table class="pure-table">
+                <thead>
                     <tr>
-                        <td>
-                            {{ database.id }}
-                        </td>
-                        <td>
-                            {{ database.name }}
-                        </td>
-                        <td>
-                            {{ database.items|length }}
-                        </td>
-                        <td>
-                            {{ database.containers|length }}
-                        </td>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Items</th>
+                        <th>Containers</th>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <h1>Connected clients</h1>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Revision</th>
-                    <th>Since</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for id, session in application.provider.sessions.iteritems() %}
-                    <tr>
-                        <td>
-                            {{ id }}
-                        </td>
-                        <td>
-                            {{ session.revision }}
-                        </td>
-                        <td>
-                            {{ session.since }}
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <h1>Cached items</h1>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Cache key</th>
-                    <th>Size</th>
-                    <th>Uses</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for cache_key, cache_item in application.provider.item_cache.items.iteritems() %}
-                    {% if cache_item.ready  %}
+                </thead>
+                <tbody>
+                    {% for database in application.provider.server.databases.itervalues() %}
                         <tr>
                             <td>
-                                {{ cache_key }}
+                                {{ database.id }}
                             </td>
                             <td>
-                                {{ cache_item.size|human_bytes }}
+                                {{ database.name }}
                             </td>
                             <td>
-                                {{ cache_item.uses }}
+                                {{ database.items|length }}
+                            </td>
+                            <td>
+                                {{ database.containers|length }}
                             </td>
                         </tr>
-                    {% endif %}
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endfor %}
+                </tbody>
+            </table>
 
+            <h2>Connected clients</h2>
+
+            <table class="pure-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Revision</th>
+                        <th>State</th>
+                        <th>Since</th>
+                        <th>Remote address</th>
+                        <th>User agent</th>
+                        <th>Protocol Version</th>
+                        <th>Items played</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for id, session in application.provider.sessions.iteritems() %}
+                        <tr>
+                            <td>
+                                {{ id }}
+                            </td>
+                            <td>
+                                {{ session.revision }}
+                            </td>
+                            <td>
+                                {{ session.state }}
+                            </td>
+                            <td>
+                                {{ session.since.strftime('%Y-%m-%d %H:%m:%S') }}
+                            </td>
+                            <td>
+                                {{ session.remote_address }}
+                            </td>
+                            <td>
+                                {{ session.user_agent }}
+                            </td>
+                            <td>
+                                {{ session.client_version }}
+                            </td>
+                            <td>
+                                {{ session.counters["items"] }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <h2>Cached items</h2>
+
+            <table class="pure-table">
+                <thead>
+                    <tr>
+                        <th>Cache key</th>
+                        <th>Size</th>
+                        <th>Uses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cache_key, cache_item in application.provider.item_cache.items.iteritems() %}
+                        {% if cache_item.ready  %}
+                            <tr>
+                                <td>
+                                    {{ cache_key }}
+                                </td>
+                                <td>
+                                    {{ cache_item.size|human_bytes }}
+                                </td>
+                                <td>
+                                    {{ cache_item.uses }}
+                                </td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </body>
 </html>

@@ -44,7 +44,7 @@ class Application(object):
         """
 
         # Subsonic is imported here, because it somehow causes Python to crash
-        # after a fork, when it's opening a database.
+        # after a fork, when it is opening a database.
         from subdaap import subsonic
 
         # Initialize database
@@ -106,11 +106,12 @@ class Application(object):
             debug=self.verbose > 1)
 
         # Extend server with a web interface
-        webserver.extend_server_app(self, self.server.app)
+        if self.config["Daap"]["web interface"]:
+            webserver.extend_server_app(self, self.server.app)
 
     def start(self):
         """
-        Start server.
+        Start the server.
         """
 
         self.provider.synchronize()
@@ -121,7 +122,7 @@ class Application(object):
 
     def stop(self):
         """
-        Stop server.
+        Stop the server.
         """
         pass
 

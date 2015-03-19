@@ -24,6 +24,7 @@ password = string
 name = string
 interface = string(default="0.0.0.0")
 port = integer(min=1, max=65535, default=3689)
+web interface = boolean(default=True)
 password = string(default="")
 zeroconf = boolean(default=True)
 cache = boolean(default=True)
