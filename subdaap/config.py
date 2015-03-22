@@ -21,7 +21,6 @@ username = string
 password = string
 
 [Daap]
-name = string
 interface = string(default="0.0.0.0")
 port = integer(min=1, max=65535, default=3689)
 password = string(default="")
@@ -31,6 +30,7 @@ cache = boolean(default=True)
 cache timeout = integer(min=1, default=1440)
 
 [Provider]
+name = string
 database = string(default="./database.db")
 
 artwork = boolean(default=True)

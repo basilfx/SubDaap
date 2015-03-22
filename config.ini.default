@@ -22,9 +22,6 @@ password = TODO
 
 [Daap]
 
-# The name of the server.
-name = SubDaap Library
-
 # Bind to specific interface (default is 0.0.0.0).
 # interface = 192.168.1.100
 
@@ -48,6 +45,9 @@ name = SubDaap Library
 
 
 [Provider]
+
+# The name of the server.
+name = SubDaap Library
 
 # Database file path
 database = ./database.db
