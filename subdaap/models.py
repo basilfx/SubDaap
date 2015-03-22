@@ -6,6 +6,7 @@ class DatabaseCollection(models.Collection):
     def __init__(self, *args, **kwargs):
         super(DatabaseCollection, self).__init__(*args, **kwargs)
 
+        # This variable is used while iterating to store temporary result row.
         self.iter_item = None
 
     def count_items(self):

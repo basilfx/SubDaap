@@ -221,7 +221,7 @@ class FileCache(object):
 
     def expire(self):
         """
-        Cleanup items that are not in use anymore
+        Cleanup items that are not in use anymore.
         """
 
         candidates = []

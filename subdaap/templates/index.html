@@ -62,7 +62,11 @@
             <a class="pure-button button-error text-xsmall" href="/actions/shutdown">Shutdown</a>
             <a class="pure-button button-success text-xsmall" href="/actions/synchronize">Synchronize</a>
 
-            <h2>Server statistics</h2>
+            <h2>Server databases</h2>
+
+            <p>
+                Current storage revision is {{ provider.server.storage.revision }}.
+            </p>
 
             <table class="pure-table">
                 <thead>
@@ -96,7 +100,7 @@
             <h2>Connected clients</h2>
 
             <p>
-                In total, {{ provider.session_counter }} clients have been served.
+                In total, {{ provider.session_counter }} clients have been served since startup.
             </p>
 
             <table class="pure-table">
@@ -184,7 +188,7 @@
             <hr id="footer">
 
             <p class="text-xsmall">
-                SubDaap v1.0 by BasilFX. <a href="https://www.github.com/basilfx/SubDaap">Github</a> project page.
+                SubDaap v1.2.0 by BasilFX. <a href="https://www.github.com/basilfx/SubDaap">Github</a> project page.
             </p>
         </div>
     </body>
