@@ -9,7 +9,7 @@ import gevent.event
 import gevent.queue
 
 import logging
-import cPickle
+
 
 # Logger instance
 logger = logging.getLogger(__name__)
@@ -23,28 +23,32 @@ class SubSonicProvider(provider.Provider):
     # Persistent IDs are supported.
     supports_persistent_id = True
 
-    def __init__(self, db, connections, artwork_cache, item_cache, state_file,
-                 transcode, transcode_unsupported):
+    def __init__(self, server_name, db, connections, artwork_cache, item_cache,
+                 state, transcode, transcode_unsupported):
         """
         """
 
         super(SubSonicProvider, self).__init__()
 
         self.db = db
-        self.db.create_database(drop_all=False)
-
+        self.state = state
         self.connections = connections
         self.artwork_cache = artwork_cache
         self.item_cache = item_cache
-        self.state_file = state_file
         self.transcode = transcode
         self.transcode_unsupported = transcode_unsupported
 
         self.lock = gevent.lock.Semaphore()
         self.ready = gevent.event.Event()
 
+        self.synchronizers = {}
+
         self.setup_state()
         self.setup_library()
+
+        # Set server name and persistent ID.
+        self.server.name = server_name
+        self.server.persistent_id = self.state["persistent_id"]
 
         # iTunes 12.1 doesn't work when the revision number is one. Since this
         # provider loads the data directly from the database, the revision
@@ -68,7 +72,8 @@ class SubSonicProvider(provider.Provider):
         """
         """
 
-        self.load_state()
+        if "persistent_id" not in self.state:
+            self.state["persistent_id"] = generate_persistent_id()
 
         # Ensure keys are available
         if "connections" not in self.state:
@@ -85,7 +90,7 @@ class SubSonicProvider(provider.Provider):
         """
         """
 
-        self.synchronizers = {}
+        self.db.create_database(drop_all=False)
         self.server = Server(db=self.db)
 
         # Initialize synchronizer for each connection.
@@ -152,7 +157,7 @@ class SubSonicProvider(provider.Provider):
                     changed = True
 
         if changed:
-            self.save_state()
+            self.state.save()
 
             self.ready.set()
             self.ready.clear()
@@ -207,35 +212,6 @@ class SubSonicProvider(provider.Provider):
                 remote_id, tformat="mp3")
         else:
             return self.connections[database_id].download(remote_id)
-
-    def load_state(self):
-        """
-        Load provider state.
-        """
-
-        logger.debug("Loading provider state from '%s'.", self.state_file)
-
-        with self.lock:
-            try:
-                with open(self.state_file, "rb") as fp:
-                    self.state = cPickle.load(fp)
-
-                # Make sure it's a dict
-                if type(self.state) != dict:
-                    self.state = {}
-            except (IOError, EOFError, cPickle.UnpicklingError):
-                self.state = {}
-
-    def save_state(self):
-        """
-        Save provider state.
-        """
-
-        logger.debug("Saving provider state from '%s'.", self.state_file)
-
-        with self.lock:
-            with open(self.state_file, "wb") as fp:
-                cPickle.dump(self.state, fp)
 
 
 class Synchronizer(object):

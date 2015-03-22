@@ -81,7 +81,7 @@ def daemonize(pid_file=None):
     # debugging trouble.
     assert atexit.register and os.fork and sys.stdout and gc.collect
 
-    # Cleanup old resources to minimize the risk of sharing.
+    # Force cleanup old resources to minimize the risk of sharing them.
     gc.collect()
 
     # First fork
@@ -129,7 +129,7 @@ def daemonize(pid_file=None):
 
 def main():
     """
-    Main entry point. Parses arguments, daemonizes and creates the application.
+    Main entry point. Parses arguments, daemonize and creates the application.
     """
 
     # Parse arguments and configure application instance.

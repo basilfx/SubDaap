@@ -73,7 +73,7 @@ class Database(object):
                 self.connection.executescript(extra + """
                     CREATE TABLE IF NOT EXISTS `databases` (
                         `id` INTEGER PRIMARY KEY,
-                        `persistent_id` INTEGER DEFAULT 0,
+                        `persistent_id` INTEGER NOT NULL,
                         `name` varchar(255) NOT NULL,
                         `exclude` tinyint(1) DEFAULT 0,
                         `checksum` int(11) NOT NULL,
@@ -107,7 +107,7 @@ class Database(object):
                     );
                     CREATE TABLE IF NOT EXISTS `items` (
                         `id` INTEGER PRIMARY KEY,
-                        `persistent_id` INTEGER DEFAULT 0,
+                        `persistent_id` INTEGER NOT NULL,
                         `database_id` int(11) NOT NULL,
                         `artist_id` int(11) DEFAULT NULL,
                         `album_id` int(11) DEFAULT NULL,
@@ -131,7 +131,7 @@ class Database(object):
                     );
                     CREATE TABLE IF NOT EXISTS `containers` (
                         `id` INTEGER PRIMARY KEY,
-                        `persistent_id` INTEGER DEFAULT 0,
+                        `persistent_id` INTEGER NOT NULL,
                         `database_id` int(11) NOT NULL,
                         `parent_id` int(11) DEFAULT NULL,
                         `name` varchar(255) NOT NULL,
@@ -148,7 +148,6 @@ class Database(object):
                         `id` INTEGER PRIMARY KEY,
                         `persistent_id` INTEGER DEFAULT 0,
                         `database_id` int(11) NOT NULL,
-                        `container_id` int(11) NOT NULL,
                         `item_id` int(11) NOT NULL,
                         `order` int(11) DEFAULT NULL,
                         CONSTRAINT `container_item_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)

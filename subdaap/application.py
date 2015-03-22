@@ -1,4 +1,7 @@
-from subdaap import provider, config, database, cache, webserver
+from subdaap.provider import SubSonicProvider
+from subdaap.database import Database
+from subdaap.state import State
+from subdaap import cache, config, webserver
 
 from daapserver import DaapServer
 
@@ -48,7 +51,11 @@ class Application(object):
         from subdaap import subsonic
 
         # Initialize database
-        db = database.Database(self.config["Provider"]["database"])
+        db = Database(self.config["Provider"]["database"])
+
+        # Setup state
+        state = State(os.path.join(
+            self.get_cache_dir(), "provider.state"))
 
         # Initialize connections.
         connections = {}
@@ -75,12 +82,13 @@ class Application(object):
         logger.debug(
             "Setting up Provider with %d connections", len(connections))
 
-        self.provider = provider.SubSonicProvider(
+        self.provider = SubSonicProvider(
             db=db,
+            state=state,
+            server_name=self.config["Provider"]["name"],
             connections=connections,
             artwork_cache=artwork_cache,
             item_cache=item_cache,
-            state_file=os.path.join(self.get_cache_dir(), "provider.state"),
             transcode=self.config["Provider"]["item transcode"],
             transcode_unsupported=self.config["Provider"][
                 "item transcode unsupported"])
@@ -96,7 +104,6 @@ class Application(object):
 
         self.server = DaapServer(
             provider=self.provider,
-            server_name=self.config["Daap"]["name"],
             password=self.config["Daap"]["password"],
             ip=self.config["Daap"]["interface"],
             port=self.config["Daap"]["port"],

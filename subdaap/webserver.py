@@ -12,8 +12,14 @@ logger = logging.getLogger(__name__)
 
 def extend_server_app(application, app):
     """
-    Since the DAAP server is basically a normal HTTP server, extend the it with
-    a webinterface for easy access and stats.
+    Since the DAAP server is basically a normal HTTP server, extend it with a
+    web interface for easy access and statistics.
+
+    If the DAAPServer was configured with a password, the default username is
+    empty and the password is equal to the configured password.
+
+    :param Application application: SubDaap application for information.
+    :param Flask app: Flask/DAAPServer to extend.
     """
 
     # Set the jinja2 loader
@@ -30,7 +36,9 @@ def extend_server_app(application, app):
         Default index.
         """
 
-        return render_template("index.html", application=application)
+        return render_template(
+            "index.html", application=application,
+            provider=application.provider)
 
     @app.route("/actions/<action>")
     @app.authenticate
