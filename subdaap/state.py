@@ -13,6 +13,13 @@ class State(object):
     """
 
     def __init__(self, file_name):
+        """
+        Construct a new State instance. The state will be directly loaded from
+        file.
+
+        :param str file_name: Path to state file.
+        """
+
         self.file_name = file_name
         self.lock = Semaphore()
         self.state = {}
@@ -33,7 +40,8 @@ class State(object):
 
     def load(self):
         """
-        Load state from file.
+        Load state from file. If the state file is not a dictionary or if it is
+        not a valid file, the state will be an empty dictionary.
         """
 
         logger.debug("Loading state from '%s'.", self.file_name)

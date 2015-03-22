@@ -1,4 +1,5 @@
-from subdaap import stream, utils
+from subdaap.utils import human_bytes
+from subdaap import stream
 
 from collections import OrderedDict
 
@@ -37,7 +38,10 @@ class FileCache(object):
         """
         Construct a new file cache.
 
-        Note: `max_size` is in megabytes!
+        :param str directory: Path to cache directory
+        :param int max_size: Maximum cache size (in MB), or 0 to disable.
+        :param float prune_threshold: Percentage to prune when cache size
+                                      exceeds maximum size.
         """
 
         self.name = self.__class__.__name__
@@ -93,8 +97,7 @@ class FileCache(object):
         logger.debug(
             "%s: %d files in cache (%d permanent), size is %s/%s",
             self.name, len(self.items), len(self.items) - count,
-            utils.human_bytes(self.current_size),
-            utils.human_bytes(self.max_size))
+            human_bytes(self.current_size), human_bytes(self.max_size))
 
         # Spawn task to prune cache and expire items.
         def _task():
@@ -214,8 +217,7 @@ class FileCache(object):
             logger.debug(
                 "%s: pruned %d/%d files, current size %s/%s.",
                 self.name, len(candidates), len(self.items),
-                utils.human_bytes(self.current_size),
-                utils.human_bytes(self.max_size))
+                human_bytes(self.current_size), human_bytes(self.max_size))
 
     def expire(self):
         """
