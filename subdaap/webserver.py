@@ -55,6 +55,7 @@ def extend_server_app(application, app):
         elif action == "synchronize":
             if not application.provider.lock.locked():
                 application.provider.synchronize()
+                application.provider.cache()
             else:
                 logger.warn("Provider is still locked. Already synchronizing?")
 
