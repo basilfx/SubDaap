@@ -69,7 +69,15 @@ def force_list(value):
 
 
 def human_bytes(size):
-    for x in ["bytes", "KB", "MB", "GB"]:
+    """
+    Convert a given size (in bytes) to a human-readable representation.
+
+    :param int size: Size in bytes
+    :return: Human-readable representation of size, e.g. 1MB.
+    :rtype: str
+    """
+
+    for x in ["B", "KB", "MB", "GB"]:
         if size < 1024.0 and size > -1024.0:
             return "%3.1f%s" % (size, x)
         size /= 1024.0
@@ -84,6 +92,9 @@ def in_list(input_list):
 
 def exhaust(iterator):
     """
+    Exhaust an iterator, without returning anything.
+
+    :param iterator iterator: Iterator to exhaust.
     """
 
     for _ in iterator:
