@@ -52,14 +52,14 @@ def setup_logging(console=True, log_file=False, verbose=False):
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     level = logging.DEBUG if verbose else logging.INFO
 
-    # Add console output
+    # Add console output handler
     if console:
         console_log_handler = logging.StreamHandler()
         console_log_handler.setLevel(level)
         console_log_handler.setFormatter(formatter)
         logging.getLogger().addHandler(console_log_handler)
 
-    # Add file output
+    # Add file output handler
     if log_file:
         file_log_handler = logging.FileHandler(log_file)
         file_log_handler.setLevel(level)
@@ -74,11 +74,21 @@ def daemonize(pid_file=None):
     """
     Daemonize the current process. Returns the PID of the continuing child
     process. As an extra option, the PID of the child process can be written to
-    a specified pid file.
+    a specified PID file.
+
+    Note that parent process ends with `os._exit` instead of `sys.exit`. The
+    first will not trigger any cleanups that may have been set. These are left
+    for the child process that continues.
+
+    :param str pid_file: Path to PID file to write process ID into. Must be in
+                         a writeable folder. If left `None`, no file will be
+                         written.
+    :return: Process ID
+    :rtype: int
     """
 
     # Dependency check to make sure the imports are OK. Saves you from a lot of
-    # debugging trouble.
+    # debugging trouble when you forget to import them.
     assert atexit.register and os.fork and sys.stdout and gc.collect
 
     # Force cleanup old resources to minimize the risk of sharing them.
