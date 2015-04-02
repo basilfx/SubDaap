@@ -173,7 +173,7 @@ class SubSonicProvider(provider.Provider):
         if cache_item.iterator is None:
             remote_fd = self.connections[item.database_id].getCoverArt(
                 item.get_remote_id())
-            self.artwork_cache.download(item.id, remote_fd)
+            self.artwork_cache.download(item.id, cache_item, remote_fd)
 
             return cache_item.iterator(), None, None
         return cache_item.iterator(), None, cache_item.size
@@ -187,7 +187,7 @@ class SubSonicProvider(provider.Provider):
         if cache_item.iterator is None:
             remote_fd = self.get_item_fd(
                 item.database_id, item.get_remote_id(), item.file_suffix)
-            self.item_cache.download(item.id, remote_fd)
+            self.item_cache.download(item.id, cache_item, remote_fd)
 
             return cache_item.iterator(byte_range), item.file_type, \
                 item.file_size

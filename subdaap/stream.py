@@ -102,7 +102,7 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
 
                     yield chunk[i:j]
         finally:
-            # Make sure the greenlet gets killed when this iterator is closed
+            # Make sure the greenlet gets killed when this iterator is closed.
             greenlet.kill()
 
     return _streamer

@@ -53,12 +53,14 @@ class FileCache(object):
 
         self.items = OrderedDict()
         self.items_lock = gevent.lock.Semaphore()
+        self.prune_lock = gevent.lock.Semaphore()
 
         self.permanent_cache_keys = None
 
     def index(self, permanent_cache_keys):
         """
-        Read the cache directory and determine it's size.
+        Read the cache directory and determine its size by summing the file
+        size of its contents.
         """
 
         self.permanent_cache_keys = permanent_cache_keys
@@ -131,6 +133,9 @@ class FileCache(object):
         new_item = False
         wait_for_ready = True
 
+        # The lock is required to make sure that two concurrent I/O bounded
+        # greenlets do not add or remove items at the same time (for instance
+        # `self.prune`).
         with self.items_lock:
             try:
                 cache_item = self.items[cache_key]
@@ -162,10 +167,19 @@ class FileCache(object):
             if not cache_item.ready.wait(timeout=TIMEOUT_WAIT_FOR_READY):
                 raise Exception("Waiting for cache item timed out.")
 
-        # Load the item from disk if it is not loaded.
-        if cache_item.iterator is None:
-            cache_item.ready.clear()
-            self.load(cache_key)
+            # This may happen when some greenlet is waiting for the item to
+            # become ready after its flag was cleared in the expire method. It
+            # is probably possible to recover by re-iterating this method, but
+            # first want to make sure this is a likely situation.
+            if cache_item.ready is None:
+                raise Exception("Item unloaded while waiting.")
+
+        # Load the item from disk if it is not loaded. The lock is needed to
+        # prevent two concurrent requests from both loading a cache item.
+        with cache_item.lock:
+            if cache_item.iterator is None:
+                cache_item.ready.clear()
+                self.load(cache_key)
 
         return cache_item
 
@@ -173,51 +187,67 @@ class FileCache(object):
         """
         Check if a certain cache key is in the cache.
         """
-        return cache_key in self.items
 
-    def prune(self):
+        with self.items_lock:
+            return cache_key in self.items
+
+    def prune(self, cleanup=False):
         """
-        Prune items from the cache, if the current_size exceeded the max_size.
+        Prune items from the cache, if `self.current_sizez exceeded
+        `self.max_size`. Only items that have been expired will be pruned,
+        unless it is marked as permanent.
+
+        :param bool cleanup: If true, clean all items except permanent ones.
         """
 
-        # Unlimited size
-        if not self.max_size or self.current_size < self.max_size:
-            return
-
-        # Determine candidates to remove.
         candidates = []
 
-        for cache_key, cache_item in self.iteritems():
-            if self.current_size < \
-                    (self.max_size * (1.0 - self.prune_threshold)):
-                break
+        with self.prune_lock, self.items_lock:
+            # Check if cleanup is required.
+            if cleanup:
+                logger.info(
+                    "%s: cleaning all items from cache, except items that are "
+                    "in use or marked as permanent.", self.name)
+            else:
+                if not self.max_size or self.current_size < self.max_size:
+                    return
 
-            if not cache_item.permanent or cache_item.uses == 0:
-                cache_item.ready.clear()
+            # Determine candidates to remove.
+            for cache_key, cache_item in self.items.iteritems():
+                if not cleanup:
+                    if self.current_size < \
+                            (self.max_size * (1.0 - self.prune_threshold)):
+                        break
 
-                candidates.append((cache_key, cache_item))
-                self.current_size -= cache_item.size
+                # keep permanent items
+                if cache_item.permanent:
+                    continue
 
-        # Actual removal
-        with self.items_lock:
-            for cache_key, cache_item in candidates:
-                cache_file = self.cache_key_to_cache_file(cache_key)
-                self.unload(cache_key)
+                # If `cache_item.ready` is not set, it is not loaded into
+                # memory.
+                if cache_item.ready is None:
+                    candidates.append((cache_key, cache_item))
+                    self.current_size -= cache_item.size
 
-                try:
-                    os.remove(cache_file)
-                except OSError as e:
-                    logger.warning(
-                        "%s: unable to remove file '%s' from cache: %s",
-                        self.name, os.path.basename(cache_file), e)
+                    del self.items[cache_key]
 
-                del self.items[cache_key]
+        # Actual removal of the files. At this point, the cache_item is not in
+        # `self.items` anymore. No other greenlet can retrieve it anymore.
+        for cache_key, cache_item in candidates:
+            cache_file = self.cache_key_to_cache_file(cache_key)
+
+            try:
+                os.remove(cache_file)
+            except OSError as e:
+                logger.warning(
+                    "%s: unable to remove file '%s' from cache: %s",
+                    self.name, os.path.basename(cache_file), e)
 
         if candidates:
             logger.debug(
-                "%s: pruned %d/%d files, current size %s/%s.",
-                self.name, len(candidates), len(self.items),
-                human_bytes(self.current_size), human_bytes(self.max_size))
+                "%s: pruned %d files, current size %s/%s (%d files).",
+                self.name, len(candidates), human_bytes(self.current_size),
+                human_bytes(self.max_size), len(self.items))
 
     def expire(self):
         """
@@ -226,18 +256,27 @@ class FileCache(object):
 
         candidates = []
 
-        for cache_key, cache_item in self.items.iteritems():
-            if cache_item.lock and cache_item.uses == 0:
-                cache_item.ready.clear()
-                candidates.append((cache_key, cache_item))
-
         with self.items_lock:
-            for cache_key, cache_item in candidates:
-                self.unload(cache_key)
+            for cache_key, cache_item in self.items.iteritems():
+                if cache_item.uses == 0:
+                    # Check if it is getting ready, e.g. one greenlet is
+                    # downloading the file.
+                    if cache_item.ready and not cache_item.ready.is_set():
+                        continue
 
-                cache_item.iterator = None
-                cache_item.lock = None
-                cache_item.ready = None
+                    # Item was ready and not in use, therefore clear the ready
+                    # flag so no one will use it.
+                    if cache_item.ready:
+                        cache_item.ready.clear()
+
+                    candidates.append((cache_key, cache_item))
+
+        for cache_key, cache_item in candidates:
+            self.unload(cache_key, cache_item)
+
+            cache_item.iterator = None
+            cache_item.lock = None
+            cache_item.ready = None
 
         if candidates:
             logger.debug("%s: expired %d files", self.name, len(candidates))
@@ -256,26 +295,29 @@ class FileCache(object):
 
             cache_item.size = file_size
 
-    def download(self, cache_key, remote_fd):
+    def download(self, cache_key, cache_item, remote_fd):
         start = time.time()
 
         def on_cache(file_size):
+            """
+            Executed when download finished. This method is executed with the
+            `cache_item` locked.
+            """
+
             logger.debug(
                 "%s: downloading '%s' took %.2f seconds.", self.name,
                 cache_key, time.time() - start)
 
             remote_fd.close()
-            self.load(cache_key)
+            self.load(cache_key, cache_item)
 
-        cache_item = self.items[cache_key]
         cache_file = self.cache_key_to_cache_file(cache_key)
         cache_item.iterator = stream.stream_from_remote(
             cache_item.lock, remote_fd, cache_file, on_cache=on_cache)
 
 
 class ArtworkCache(FileCache):
-    def load(self, cache_key):
-        cache_item = self.items[cache_key]
+    def load(self, cache_key, cache_item):
         cache_file = self.cache_key_to_cache_file(cache_key)
 
         def on_start():
@@ -301,9 +343,7 @@ class ArtworkCache(FileCache):
             on_start=on_start, on_finish=on_finish)
         cache_item.ready.set()
 
-    def unload(self, cache_key):
-        cache_item = self.items[cache_key]
-
+    def unload(self, cache_key, cache_item):
         if cache_item.data:
             cache_item.data.close()
             cache_item.data = None
@@ -311,8 +351,7 @@ class ArtworkCache(FileCache):
 
 class ItemCache(FileCache):
 
-    def load(self, cache_key):
-        cache_item = self.items[cache_key]
+    def load(self, cache_key, cache_item):
         cache_file = self.cache_key_to_cache_file(cache_key)
 
         def on_start():
@@ -341,9 +380,7 @@ class ItemCache(FileCache):
             on_start=on_start, on_finish=on_finish)
         cache_item.ready.set()
 
-    def unload(self, cache_key):
-        cache_item = self.items[cache_key]
-
+    def unload(self, cache_key, cache_item):
         if cache_item.data:
             local_fd, mmap_fd = cache_item.data
 
