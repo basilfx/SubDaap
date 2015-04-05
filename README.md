@@ -48,3 +48,5 @@ Add `--daemon` to run the program in the background.
 
 ## License
 See the `LICENSE` file (MIT license).
+
+The web interfaces uses the [Pure.css](http://purecss.io/) CSS framework.
