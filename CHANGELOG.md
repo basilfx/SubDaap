@@ -1,12 +1,14 @@
 # Changelog
 
 ## v1.2.0
-Released XX March 2015
+Released XX April 2015
 
 Highlights:
 * Fixed: compatibility with iTunes 12.1/Flask-DAAPServer v2.3.0
 * Fixed: items without artist/album not showing up
+* Fixed: potential race conditions in prune/expire/streaming code
 * Improved: status page
+* Improved: Python 2.7.9 compatibility if accessing SubSonic via SSL
 
 The full list of commits can be found [here](https://github.com/basilfx/flask-daapserver/compare/v1.1.0...v1.2.0).
 
