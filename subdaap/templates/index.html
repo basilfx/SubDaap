@@ -5,7 +5,7 @@
         <title>SubDaap</title>
 
         <!-- CSS -->
-        <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+        <link rel="stylesheet" href="/static/css/pure-min.css">
 
         <style type="text/css">
             .text-xsmall {
@@ -169,6 +169,8 @@
                         <th>Cache key</th>
                         <th>Size</th>
                         <th>Uses</th>
+                        <th>Ready</th>
+                        <th>Permanent</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -183,10 +185,16 @@
                             <td>
                                 {{ cache_item.uses }}
                             </td>
+                            <td>
+                                {{ cache_item.ready.is_set() }}
+                            </td>
+                            <td>
+                                {{ cache_item.permanent }}
+                            </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="3">No cached items in use</td>
+                            <td colspan="5">No cached items in use</td>
                         </tr>
                     {% endfor %}
                 </tbody>

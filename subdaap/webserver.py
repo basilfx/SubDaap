@@ -1,6 +1,6 @@
 from subdaap import utils
 
-from flask import render_template, redirect, url_for
+from flask import render_template, redirect, url_for, send_from_directory
 
 import logging
 import jinja2
@@ -24,6 +24,8 @@ def extend_server_app(application, app):
 
     # Set the jinja2 loader
     template_path = os.path.join(os.path.dirname(__file__), "templates")
+    static_path = os.path.join(os.path.dirname(__file__), "static")
+
     app.jinja_loader = jinja2.ChoiceLoader([
         app.jinja_loader, jinja2.FileSystemLoader(template_path)])
 
@@ -39,6 +41,15 @@ def extend_server_app(application, app):
         return render_template(
             "index.html", application=application,
             provider=application.provider)
+
+    @app.route("/static/<path:path>")
+    @app.authenticate
+    def static(path):
+        """
+        Handle static files from the `static_path` folder.
+        """
+
+        return send_from_directory(static_path, path)
 
     @app.route("/actions/<action>")
     @app.authenticate
