@@ -40,8 +40,8 @@ class FileCache(object):
 
         :param str directory: Path to cache directory
         :param int max_size: Maximum cache size (in MB), or 0 to disable.
-        :param float prune_threshold: Percentage to prune when cache size
-                                      exceeds maximum size.
+        :param float prune_threshold: Percentage of size to prune when cache
+                                      size exceeds maximum size.
         """
 
         self.name = self.__class__.__name__
@@ -170,16 +170,15 @@ class FileCache(object):
             # This may happen when some greenlet is waiting for the item to
             # become ready after its flag was cleared in the expire method. It
             # is probably possible to recover by re-iterating this method, but
-            # first want to make sure this is a likely situation.
+            # first want to make sure if this situation is likely to happen.
             if cache_item.ready is None:
                 raise Exception("Item unloaded while waiting.")
 
         # Load the item from disk if it is not loaded. The lock is needed to
         # prevent two concurrent requests from both loading a cache item.
-        with cache_item.lock:
-            if cache_item.iterator is None:
-                cache_item.ready.clear()
-                self.load(cache_key)
+        if cache_item.iterator is None:
+            cache_item.ready.clear()
+            self.load(cache_key, cache_item)
 
         return cache_item
 
