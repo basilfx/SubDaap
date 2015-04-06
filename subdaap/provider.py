@@ -120,12 +120,13 @@ class SubSonicProvider(provider.Provider):
                 if not self.artwork_cache.contains(local_id):
                     cache_item = self.artwork_cache.get(local_id)
 
-                    if cache_item.iterator is None:
+                    if cache_item.ready is None:
                         remote_fd = self.connections[database_id].getCoverArt(
                             remote_id)
-                        self.artwork_cache.download(local_id, remote_fd)
+                        self.artwork_cache.download(
+                            local_id, cache_item, remote_fd)
 
-                        # Exhaust iterator so it actually downloads the item.
+                        # Exhaust iterator so it downloads the artwork.
                         utils.exhaust(cache_item.iterator())
                     self.artwork_cache.unload(local_id)
 
@@ -133,12 +134,13 @@ class SubSonicProvider(provider.Provider):
                 if not self.item_cache.contains(local_id):
                     cache_item = self.item_cache.get(local_id)
 
-                    if cache_item.iterator is None:
+                    if cache_item.ready is None:
                         remote_fd = self.get_item_fd(
                             database_id, remote_id, file_suffix)
-                        self.item_cache.download(local_id, remote_fd)
+                        self.item_cache.download(
+                            local_id, cache_item, remote_fd)
 
-                        # Exhaust iterator so it actually downloads the item.
+                        # Exhaust iterator so it downloads the item.
                         utils.exhaust(cache_item.iterator())
                     self.item_cache.unload(local_id)
 
@@ -172,7 +174,7 @@ class SubSonicProvider(provider.Provider):
 
         if cache_item.iterator is None:
             remote_fd = self.connections[item.database_id].getCoverArt(
-                item.get_remote_id())
+                item.remote_id)
             self.artwork_cache.download(item.id, cache_item, remote_fd)
 
             return cache_item.iterator(), None, None
@@ -186,7 +188,7 @@ class SubSonicProvider(provider.Provider):
 
         if cache_item.iterator is None:
             remote_fd = self.get_item_fd(
-                item.database_id, item.get_remote_id(), item.file_suffix)
+                item.database_id, item.remote_id, item.file_suffix)
             self.item_cache.download(item.id, cache_item, remote_fd)
 
             return cache_item.iterator(byte_range), item.file_type, \
