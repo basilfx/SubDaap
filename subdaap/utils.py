@@ -29,11 +29,18 @@ class PathAction(argparse.Action):
         setattr(args, self.dest, path)
 
 
-def dict_checksum(input_dict):
+def dict_checksum(*args, **kwargs):
     """
     Calculate a hash of the values of a dictionary.
     """
 
+    # Accept kwargs as input dict
+    if len(args) == 1:
+        input_dict = args[0]
+    else:
+        input_dict = kwargs
+
+    # Calculate checksum
     data = bytearray()
 
     for value in input_dict.itervalues():
@@ -58,6 +65,13 @@ def force_dict(value):
 def force_list(value):
     """
     Coerce the input value to a list.
+
+    If `value` is `None`, return an empty list. If it is a single value, create
+    a new list with that element on index 0.
+
+    :param value: Input value to coerce.
+    :return: Value as list.
+    :rtype: list
     """
 
     if value is None:
@@ -72,12 +86,12 @@ def human_bytes(size):
     """
     Convert a given size (in bytes) to a human-readable representation.
 
-    :param int size: Size in bytes
+    :param int size: Size in bytes.
     :return: Human-readable representation of size, e.g. 1MB.
     :rtype: str
     """
 
-    for x in ["B", "KB", "MB", "GB"]:
+    for x in ("B", "KB", "MB", "GB"):
         if size < 1024.0 and size > -1024.0:
             return "%3.1f%s" % (size, x)
         size /= 1024.0
