@@ -102,6 +102,7 @@ class DatabaseCollection(models.Collection):
                         `items`.`id`,
                         `items`.`database_id`,
                         `items`.`persistent_id`,
+                        `items`.`remote_id`,
                         `items`.`name`,
                         `items`.`track`,
                         `items`.`year`,
@@ -274,6 +275,11 @@ class Server(models.BaseServer):
         self.db = db
 
     def get_cached_items(self):
+        """
+        Get all items that should be permanently cached, independent of which
+        database.
+        """
+
         with self.db.get_cursor() as cursor:
             return cursor.query_dict("""
                 SELECT
@@ -308,22 +314,11 @@ class Item(models.BaseItem):
     Database-aware Item object.
     """
 
-    __slots__ = models.Item.__slots__ + ("db", )
+    __slots__ = models.Item.__slots__ + ("db", "remote_id")
 
     def __init__(self, db, *args, **kwargs):
         super(Item, self).__init__(*args, **kwargs)
         self.db = db
-
-    def get_remote_id(self):
-        with self.db.get_cursor() as cursor:
-            return cursor.query_value("""
-                SELECT
-                    `items`.`remote_id`
-                FROM
-                    `items`
-                WHERE
-                    `items`.`id` = ?
-                """, self.id)
 
 
 class Container(models.BaseContainer):
