@@ -1,10 +1,7 @@
+from subdaap import utils
+
 import urlparse
 import libsonic
-import logging
-import utils
-
-# Logger instance
-logger = logging.getLogger(__name__)
 
 
 class Connection(libsonic.Connection):
@@ -14,6 +11,11 @@ class Connection(libsonic.Connection):
     - Add library name property.
     - Parse URL for host and port for constructor.
     - Make sure API results are of correct type.
+
+    :param str name: Name of connection.
+    :param str url: Full URL (including protocol) of SubSonic server.
+    :param str username: Username of server.
+    :param str password: Password of server.
     """
 
     def __init__(self, name, url, username, password):
@@ -50,13 +52,13 @@ class Connection(libsonic.Connection):
 
         def _index_iterator(index):
             for index in utils.force_list(index):
-                index["artist"] = _artists_iterator(index.get("artist"))
+                index["artist"] = list(_artists_iterator(index.get("artist")))
                 yield index
 
         response = super(Connection, self).getIndexes(*args, **kwargs)
         response["indexes"] = response.get("indexes", {})
-        response["indexes"]["index"] = list(_index_iterator(
-            response["indexes"].get("index")))
+        response["indexes"]["index"] = list(
+            _index_iterator(response["indexes"].get("index")))
 
         return response
 
@@ -100,8 +102,8 @@ class Connection(libsonic.Connection):
                 yield album
 
         response = super(Connection, self).getArtist(*args, **kwargs)
-        response["artist"]["album"] = list(_albums_iterator(
-            response["artist"].get("album")))
+        response["artist"]["album"] = list(
+            _albums_iterator(response["artist"].get("album")))
 
         return response
 
@@ -125,7 +127,7 @@ class Connection(libsonic.Connection):
                 yield child
 
         response = super(Connection, self).getMusicDirectory(*args, **kwargs)
-        response["directory"]["child"] = list(_children_iterator(
-            response["directory"].get("child")))
+        response["directory"]["child"] = list(
+            _children_iterator(response["directory"].get("child")))
 
         return response
