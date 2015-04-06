@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 
 class Synchronizer(object):
+    """
+    Synchronizer class for synchronizing one SubSonic server with one local
+    database.
+    """
 
     def __init__(self, state, server, db, connection, index):
         self.state = state
@@ -134,15 +138,10 @@ class Synchronizer(object):
                     `containers`.`is_base` = 1
                 """, self.database_id)
 
-            # For debugging
-            assert len(local_databases) < 2 and len(local_containers) < 2
-
             #
             # Database information
             #
-            database_checksum = utils.dict_checksum({
-                "name": self.connection.name
-            })
+            database_checksum = utils.dict_checksum(name=self.connection.name)
 
             if self.database_id not in local_databases:
                 cursor = cursor.query(
@@ -183,10 +182,8 @@ class Synchronizer(object):
             #
             # Base container
             #
-            container_checksum = utils.dict_checksum({
-                "is_base": 1,
-                "name": self.connection.name
-            })
+            container_checksum = utils.dict_checksum(
+                is_base=1, name=self.connection.name)
 
             if not local_containers:
                 cursor = cursor.query(
@@ -247,8 +244,6 @@ class Synchronizer(object):
 
         with self.db.get_write_cursor() as cursor:
             # Fetch local database ID and container ID
-            database_id = self.database_id
-
             container_id = cursor.query_value(
                 """
                 SELECT
@@ -258,7 +253,7 @@ class Synchronizer(object):
                 WHERE
                     `containers`.`is_base` = 1 AND
                     `containers`.`database_id` = ?
-                """, database_id)
+                """, self.database_id)
 
             # Load local items
             local_artists = cursor.query_dict(
@@ -271,7 +266,7 @@ class Synchronizer(object):
                     `artists`
                 WHERE
                     `artists`.`database_id` = ?
-                """, database_id)
+                """, self.database_id)
             local_albums = cursor.query_dict(
                 """
                 SELECT
@@ -282,7 +277,7 @@ class Synchronizer(object):
                     `albums`
                 WHERE
                     `albums`.`database_id` = ?
-                """, database_id)
+                """, self.database_id)
             local_items = cursor.query_dict(
                 """
                 SELECT
@@ -293,7 +288,7 @@ class Synchronizer(object):
                     `items`
                 WHERE
                     `items`.`database_id` = ?
-                """, database_id)
+                """, self.database_id)
             local_container_items = cursor.query_dict(
                 """
                 SELECT
@@ -301,7 +296,7 @@ class Synchronizer(object):
                 FROM
                     `container_items`
                 WHERE
-                    `container_items`.`id` = ?
+                    `container_items`.`container_id` = ?
                 """, container_id)
 
             # Compute local IDs
@@ -321,9 +316,8 @@ class Synchronizer(object):
                     remote_artist_id = item["artistId"]
 
                     if remote_artist_id not in added_artists:
-                        artist_checksum = utils.dict_checksum({
-                            "name": item["artist"]
-                        })
+                        artist_checksum = utils.dict_checksum(
+                            name=item["artist"])
 
                         # Check if artist has changed
                         if remote_artist_id not in local_artists:
@@ -337,7 +331,7 @@ class Synchronizer(object):
                                 VALUES
                                     (?, ?, ?, ?)
                                 """,
-                                database_id,
+                                self.database_id,
                                 item["artist"],
                                 remote_artist_id,
                                 artist_checksum)
@@ -360,7 +354,7 @@ class Synchronizer(object):
                                 artist_checksum,
                                 local_artists[remote_artist_id][1])
 
-                        # Mark as added/edited, so it won't be processed again
+                        # Mark as added/edited, so it won't be processed again.
                         added_artists.add(remote_artist_id)
 
                         #
@@ -387,7 +381,7 @@ class Synchronizer(object):
                                         VALUES
                                            (?, ?, ?, ?, ?, ?)
                                         """,
-                                        database_id,
+                                        self.database_id,
                                         local_artists[remote_artist_id][1],
                                         album["name"],
                                         int("coverArt" in album),
@@ -415,7 +409,7 @@ class Synchronizer(object):
                                         local_albums[remote_album_id][1])
 
                                 # Mark as added/edited, so it won't be processed
-                                # again
+                                # again.
                                 added_albums.add(remote_album_id)
 
                 #
@@ -462,7 +456,7 @@ class Synchronizer(object):
                                 (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                             """,
                             generate_persistent_id(),
-                            database_id,
+                            self.database_id,
                             item_artist_id,
                             item_album_id,
                             item.get("title"),
@@ -518,30 +512,31 @@ class Synchronizer(object):
                             item_checksum,
                             local_items[remote_item_id][1])
 
-                    # Mark as added/edited, so it wont' be processed again
+                    # Mark as added/edited, so it won't be processed again.
                     added_items.add(remote_item_id)
 
                 #
                 # Container item information
                 #
-                if local_items[remote_item_id][1] not in local_container_items_ids:
+                if local_items[remote_item_id][1] not in local_container_items:
                     cursor.query(
                         """
                         INSERT INTO `container_items` (
-                            `persistent_id`,
                             `database_id`,
                             `container_id`,
                             `item_id`)
                         VALUES
-                            (?, ?, ?, ?)
+                            (?, ?, ?)
                         """,
-                        generate_persistent_id(),
-                        database_id,
+                        self.database_id,
                         container_id,
                         local_items[remote_item_id][1])
 
                     # Store insert ID
                     local_container_items[local_items[remote_item_id][1]] = ()
+
+                # Mark as added/edites, so it won't be processed again.
+                added_container_items.add(local_items[remote_item_id][1])
 
             # Calculate deleted artists
             deleted_artists = local_artists_ids - added_artists
@@ -564,28 +559,28 @@ class Synchronizer(object):
                 WHERE
                     `items`.`remote_id` IN (%s) AND
                     `items`.`database_id` = ?
-                """ % utils.in_list(deleted_items), database_id)
+                """ % utils.in_list(deleted_items), self.database_id)
             cursor.query("""
                 DELETE FROM
                     `artists`
                 WHERE
                     `artists`.`remote_id` IN (%s) AND
                     `artists`.`database_id` = ?
-                """ % utils.in_list(deleted_artists), database_id)
+                """ % utils.in_list(deleted_artists), self.database_id)
             cursor.query("""
                 DELETE FROM
                     `albums`
                 WHERE
                     `albums`.`remote_id` IN (%s) AND
                     `albums`.`database_id` = ?
-                """ % utils.in_list(deleted_albums), database_id)
+                """ % utils.in_list(deleted_albums), self.database_id)
 
             # Return all additions and deletions
-            return (
-                added_artists, deleted_artists,
-                added_albums, deleted_albums,
-                added_items, deleted_items,
-                added_container_items, deleted_container_items)
+            return \
+                added_artists, deleted_artists, \
+                added_albums, deleted_albums, \
+                added_items, deleted_items, \
+                added_container_items, deleted_container_items
 
     def sync_playlists(self):
         """
@@ -629,11 +624,9 @@ class Synchronizer(object):
                 remote_container_id = container["id"]
 
                 if remote_container_id not in added_containers:
-                    container_checksum = utils.dict_checksum({
-                        "is_base": 0,
-                        "name": container["name"],
-                        "songCount": container["songCount"]
-                    })
+                    container_checksum = utils.dict_checksum(
+                        is_base=0, name=container["name"],
+                        song_count=container["songCount"])
 
                     # Check if container has changed
                     if remote_container_id not in local_containers_ids:
@@ -737,15 +730,13 @@ class Synchronizer(object):
             cursor.query(
                 """
                 INSERT INTO `container_items` (
-                    `persistent_id`,
                     `database_id`,
                     `container_id`,
                     `item_id`,
                     `order`)
                 VALUES
-                    (?, ?, ?, ?, ?)
+                    (?, ?, ?, ?)
                 """,
-                generate_persistent_id(),
                 database_id,
                 container_id,
                 local_items[entry["id"]][0],
