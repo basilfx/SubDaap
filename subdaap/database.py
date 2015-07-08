@@ -64,7 +64,8 @@ class Database(object):
         """
         Create the default databases. Drop old ones if `drop_all` is `True`.
 
-        :param bool drop_all: Drop existing tables if they exist.
+        :param bool drop_all: Drop existing tables if they exist. All data will
+                              be lost.
         """
 
         with self.lock:
@@ -73,7 +74,7 @@ class Database(object):
                 extra = """
                     DROP TABLE IF EXISTS `databases`;
                     DROP TABLE IF EXISTS `items`;
-                    DROP TABLE IF EXISTS `containers`'
+                    DROP TABLE IF EXISTS `containers`;
                     DROP TABLE IF EXISTS `container_items`;
                     """
             else:
@@ -196,7 +197,7 @@ class Cursor(sqlite3.Cursor):
         result = dict()
 
         for row in self.execute(query, args):
-            result[row[0]] = [row[i] for i in range(1, len(row))]
+            result[row[0]] = dict(row)
 
         return result
 
@@ -204,3 +205,9 @@ class Cursor(sqlite3.Cursor):
         """
         """
         return self.execute(query, args)
+
+    def query_one(self, query, *args):
+        """
+        """
+
+        return self.execute(query, args).fetchone()

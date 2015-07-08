@@ -4,9 +4,9 @@ version = 2
 [SubSonic]
 
 # You can define multiple SubSonic libraries here. Each connection will be
-# considered as a separate database. Altough the DAAP protocol supports multiple
-# databases, iTunes only supports one library. The name of the key defines it's
-# name. The order is important, so don't move sections around!
+# considered as a separate database. Although the DAAP protocol supports
+# multiple databases, iTunes only supports one library. The name of the key
+# defines it's name. The order is important, so don't move sections around!
 
 [[ My SubSonic Library ]]
 

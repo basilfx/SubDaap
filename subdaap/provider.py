@@ -50,12 +50,6 @@ class SubSonicProvider(provider.Provider):
         self.server.name = server_name
         self.server.persistent_id = self.state["persistent_id"]
 
-        # iTunes 12.1 doesn't work when the revision number is one. Since this
-        # provider loads the data directly from the database, the revision
-        # number doesn't change. Therefore, increase the revision number by
-        # committing.
-        self.server.storage.commit()
-
     def wait_for_update(self):
         """
         Block the serving greenlet until a new revision is available, e.g. the
@@ -66,7 +60,7 @@ class SubSonicProvider(provider.Provider):
         self.ready.wait()
 
         # Return the revision number
-        return self.server.storage.revision
+        return self.server.revision
 
     def setup_state(self):
         """
@@ -98,6 +92,9 @@ class SubSonicProvider(provider.Provider):
             self.synchronizers[index] = Synchronizer(
                 self.state["connections"][index], self.server, self.db,
                 connection, index)
+
+        # Commit initial structure.
+        self.server.commit()
 
     def cache(self):
         """
@@ -161,6 +158,12 @@ class SubSonicProvider(provider.Provider):
         if changed:
             self.state.save()
 
+            # Commit new structure
+            self.server.commit()
+            print "\n".join(self.server.to_tree())
+            logger.info("New revision is %d", self.server.revision)
+
+            # Wake-up clients who are waiting for updates.
             self.ready.set()
             self.ready.clear()
 

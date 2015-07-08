@@ -113,3 +113,27 @@ def exhaust(iterator):
 
     for _ in iterator:
         pass
+
+
+def chunks(iterator, size):
+    """
+    Chunk an iterator into blocks of fixed size. Only the last block can be
+    smaller than the specified size.
+
+    :param iterator iterator: Iterator to exhaust.
+    :param int size: Size of blocks to yield.
+    """
+
+    items = [None] * size
+    count = 0
+
+    for item in iterator:
+        items[count] = item
+        count += 1
+
+        if count == size:
+            yield items
+            count = 0
+
+    # Yield remaining
+    yield items[:count]

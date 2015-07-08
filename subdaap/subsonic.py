@@ -10,7 +10,7 @@ class Connection(libsonic.Connection):
 
     - Add library name property.
     - Parse URL for host and port for constructor.
-    - Make sure API results are of correct type.
+    - Make sure API results are of of uniform type.
 
     :param str name: Name of connection.
     :param str url: Full URL (including protocol) of SubSonic server.
@@ -55,10 +55,27 @@ class Connection(libsonic.Connection):
                 index["artist"] = list(_artists_iterator(index.get("artist")))
                 yield index
 
+        def _children_iterator(children):
+            for child in utils.force_list(children):
+                child["id"] = int(child["id"])
+
+                if "parent" in child:
+                    child["parent"] = int(child["parent"])
+                if "coverArt" in child:
+                    child["coverArt"] = int(child["coverArt"])
+                if "artistId" in child:
+                    child["artistId"] = int(child["artistId"])
+                if "albumId" in child:
+                    child["albumId"] = int(child["albumId"])
+
+                yield child
+
         response = super(Connection, self).getIndexes(*args, **kwargs)
         response["indexes"] = response.get("indexes", {})
         response["indexes"]["index"] = list(
             _index_iterator(response["indexes"].get("index")))
+        response["indexes"]["child"] = list(
+            _children_iterator(response["indexes"].get("child")))
 
         return response
 
@@ -99,6 +116,10 @@ class Connection(libsonic.Connection):
         def _albums_iterator(albums):
             for album in utils.force_list(albums):
                 album["id"] = int(album["id"])
+
+                if "artistId" in album:
+                    album["artistId"] = int(album["artistId"])
+
                 yield album
 
         response = super(Connection, self).getArtist(*args, **kwargs)

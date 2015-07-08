@@ -19,728 +19,571 @@ class Synchronizer(object):
         self.server = server
         self.db = db
         self.connection = connection
-
-        self.database_id = index
-        self.container_id = index
-
-        self.cache = {}
-        self.base_synced = False
+        self.index = index
 
     def sync(self):
         """
         """
 
-        changed = False
-        logger.debug("Synchronizing library")
+        # Start session
+        try:
+            with self.db.get_write_cursor() as cursor:
+                self.cursor = cursor
+                self.cache = {}
 
-        # Make sure database and base container exist. This is only required
-        # once during startup.
-        if not self.base_synced:
-            self.sync_base()
-            self.base_synced = True
+                # Start synchronizing
+                self.sync_database()
+                self.sync_base_container()
+                self.sync_items()
+                self.sync_containers()
 
-        # Grab latests versions
-        items_version, playlists_version = self.sync_versions()
+            # Merge changes into the server
+            self.update_server()
+        finally:
+            # Make sure that everything is cleaned up
+            self.cursor = None
+            self.cache = None
 
-        # Items
-        if items_version != self.state["items_version"]:
-            logger.info("Remote items have changed")
-            changed = True
+        # TODO: make dependent on actual changes
+        return True
 
-            self.sync_items()
-
-        # Playlists
-        if playlists_version != self.state["playlists_version"]:
-            logger.info("Remote playlists changed")
-            changed = True
-
-            self.sync_playlists()
-
-        # Store version numbers
-        if changed:
-            self.state["items_version"] = items_version
-            self.state["playlists_version"] = playlists_version
-
-        # Finish up
-        self.cache.clear()
-        logger.info("Synchronization completed")
-
-        return changed
-
-    def sync_versions(self):
+    def update_server(self):
         """
-        Read the remote index and playlists. Return their versions, so it can
-        be decided if synchronization is required.
-
-        For the index, a `lastModified` field is available in SubSonic's
-        response message. This is not the case for playlists, so the naive
-        approach is to fetch all playlists, calulate a checksum and compare. A
-        request for a similar feature is addressed in
-        http://forum.subsonic.org/forum/viewtopic.php?f=3&t=13972.
-
-        Because the index and playlists are reused, they are stored in cache.
         """
 
-        items_version = 0
-        playlists_version = 0
+        # Helper methods
+        def updated_ids(items):
+            for value in items.itervalues():
+                if value.get("updated"):
+                    yield value["id"]
 
-        # Items
-        self.cache["index"] = response = self.connection.getIndexes(
-            ifModifiedSince=self.state["items_version"])
+        def removed_ids(items):
+            for value in items.itervalues():
+                if "updated" not in value:
+                    yield value["id"]
 
-        if "lastModified" in response["indexes"]:
-            items_version = response["indexes"]["lastModified"]
-        else:
-            items_version = self.state["items_version"]
+        # Update the server
+        server = self.server
 
-        # Playlists
-        self.cache["playlists"] = response = self.connection.getPlaylists()
+        server.databases.update_ids([self.database_id])
+        database = server.databases[self.database_id]
+        database.items.update_ids(updated_ids(self.items_by_remote_id))
+        database.items.remove_ids(removed_ids(self.items_by_remote_id))
 
-        for playlist in response["playlists"]["playlist"]:
-            self.cache["playlist_%d" % playlist["id"]] = response = \
-                self.connection.getPlaylist(playlist["id"])
+        database.containers.update_ids([self.base_container_id])
+        base_container = database.containers[self.base_container_id]
+        base_container.container_items.update_ids(
+            updated_ids(self.base_container_items_by_item_id))
+        base_container.container_items.remove_ids(
+            removed_ids(self.base_container_items_by_item_id))
 
-            playlist_checksum = utils.dict_checksum(response["playlist"])
-            playlists_version = (playlists_version + playlist_checksum) \
-                % 0xFFFFFFFF
-
-        # Return version numbers
-        return items_version, playlists_version
-
-    def sync_base(self):
+    def sync_database(self):
         """
-        Synchronize database and base container.
         """
 
-        added_databases = set()
-        added_containers = set()
+        # Calculate checksum
+        checksum = utils.dict_checksum(
+            name=self.connection.name, remote_id=self.index)
 
-        with self.db.get_write_cursor() as cursor:
-            local_databases = cursor.query_dict("""
+        # Fetch existing item
+        try:
+            row = self.cursor.query_one(
+                """
                 SELECT
                     `databases`.`id`,
                     `databases`.`checksum`
                 FROM
                     `databases`
+                WHERE
+                    `databases`.`remote_id` = ?
+                """, self.index)
+        except IndexError:
+            row = None
+
+        # To insert or to update
+        if row is None:
+            database_id = self.cursor.query(
+                """
+                INSERT INTO `databases` (
+                    `persistent_id`,
+                    `name`,
+                    `checksum`,
+                    `remote_id`)
+                VALUES
+                    (?, ?, ?, ?)
+                """,
+                generate_persistent_id(),
+                self.connection.name,
+                checksum,
+                self.index).lastrowid
+        elif row["checksum"] != checksum:
+            database_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `databases`
+                SET
+                    `name` = ?,
+                    `checksum` = ?
                 WHERE
                     `databases`.`id` = ?
-                """, self.database_id)
-            local_containers = cursor.query_dict("""
+                """,
+                self.connection.name,
+                checksum,
+                database_id)
+        else:
+            database_id = row["id"]
+
+        # Update cache
+        self.database_id = database_id
+
+    def sync_base_container(self):
+        """
+        """
+
+        # Calculate checksum
+        checksum = utils.dict_checksum(
+            is_base=True, is_smart=False, name=self.connection.name)
+
+        # Fetch existing item
+        try:
+            row = self.cursor.query_one(
+                """
                 SELECT
-                    `databases`.`id`,
-                    `databases`.`checksum`
+                    `containers`.`id`,
+                    `containers`.`checksum`
                 FROM
-                    `containers`,
-                    `databases`
+                    `containers`
                 WHERE
-                    `databases`.`id` = ? AND
-                    `containers`.`database_id` = `databases`.`id` AND
+                    `containers`.`database_id` = ? AND
                     `containers`.`is_base` = 1
                 """, self.database_id)
+        except IndexError:
+            row = None
 
-            #
-            # Database information
-            #
-            database_checksum = utils.dict_checksum(name=self.connection.name)
+        # To insert or to update
+        if row is None:
+            base_container_id = self.cursor.query(
+                """
+                INSERT INTO `containers` (
+                   `persistent_id`,
+                   `database_id`,
+                   `name`,
+                   `is_base`,
+                   `is_smart`,
+                   `checksum`)
+                VALUES
+                   (?, ?, ?, ?, ?, ?)
+                """,
+                generate_persistent_id(),
+                self.database_id,
+                self.connection.name,
+                True,
+                False,
+                checksum).lastrowid
+        elif row["checksum"] != checksum:
+            base_container_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `containers`
+                SET
+                    `name` = ?,
+                    `is_base` = ?,
+                    `is_smart` = ?,
+                    `checksum` = ?
+                WHERE
+                    `containers`.`id` = ?
+                """,
+                self.connection.name,
+                True,
+                False,
+                checksum,
+                base_container_id)
+        else:
+            base_container_id = row["id"]
 
-            if self.database_id not in local_databases:
-                cursor = cursor.query(
-                    """
-                    INSERT INTO `databases` (
-                        `id`,
-                        `persistent_id`,
-                        `name`,
-                        `checksum`)
-                    VALUES
-                        (?, ?, ?, ?)
-                    """,
-                    self.database_id,
-                    generate_persistent_id(),
-                    self.connection.name,
-                    database_checksum)
-
-                # Mark as added
-                added_databases.add(self.database_id)
-            elif database_checksum != local_databases[self.database_id][0]:
-                cursor.query(
-                    """
-                    UPDATE
-                        `databases`
-                    SET
-                        `name` = ?,
-                        `checksum` = ?
-                    WHERE
-                        `databases`.`id` = ?
-                    """,
-                    self.connection.name,
-                    database_checksum,
-                    self.database_id)
-
-                # Mark as edited
-                added_databases.add(self.database_id)
-
-            #
-            # Base container
-            #
-            container_checksum = utils.dict_checksum(
-                is_base=1, name=self.connection.name)
-
-            if not local_containers:
-                cursor = cursor.query(
-                    """
-                    INSERT INTO `containers` (
-                       `persistent_id`,
-                       `database_id`,
-                       `name`,
-                       `is_base`,
-                       `is_smart`,
-                       `checksum`)
-                    VALUES
-                       (?, ?, ?, ?, ?, ?)
-                    """,
-                    generate_persistent_id(),
-                    self.database_id,
-                    self.connection.name,
-                    int(True),
-                    int(False),
-                    container_checksum)
-
-                # Mark as added/edited, so it won't be processed again
-                added_containers.add(cursor.lastrowid)
-            else:
-                container_id = local_containers.keys()[0]
-
-                if container_checksum != local_containers[container_id][0]:
-                    cursor.query(
-                        """
-                        UPDATE
-                            `containers`
-                        SET
-                           `name` = ?,
-                           `is_base` = ?,
-                           `is_smart` = ?,
-                           `checksum` = ?
-                        WHERE
-                           `containers`.`id` = ?
-                        """,
-                        self.connection.name,
-                        int(True),
-                        int(False),
-                        container_checksum,
-                        container_id)
-
-                    # Mark as added/edited, so it won't be processed again
-                    added_containers.add(container_id)
+        # Update cache
+        self.base_container_id = base_container_id
 
     def sync_items(self):
         """
-        Synchronize artists, albums and items.
         """
 
-        added_artists = set()
-        added_albums = set()
-        added_items = set()
-        added_container_items = set()
+        # Helper methods
+        def is_artist_processed(item):
+            return item["artistId"] in self.artists_by_remote_id and \
+                "updated" in self.artists_by_remote_id[item["artistId"]]
 
-        with self.db.get_write_cursor() as cursor:
-            # Fetch local database ID and container ID
-            container_id = cursor.query_value(
-                """
-                SELECT
-                    `containers`.`id`
-                FROM
-                    `containers`
-                WHERE
-                    `containers`.`is_base` = 1 AND
-                    `containers`.`database_id` = ?
-                """, self.database_id)
+        def is_album_processed(album):
+            return album["artistId"] in self.albums_by_remote_id and  \
+                "updated" in self.albums_by_remote_id[album["artistId"]]
 
-            # Load local items
-            local_artists = cursor.query_dict(
-                """
-                SELECT
-                    `remote_id`,
-                    `checksum`,
-                    `id`
-                FROM
-                    `artists`
-                WHERE
-                    `artists`.`database_id` = ?
-                """, self.database_id)
-            local_albums = cursor.query_dict(
-                """
-                SELECT
-                    `remote_id`,
-                    `checksum`,
-                    `id`
-                FROM
-                    `albums`
-                WHERE
-                    `albums`.`database_id` = ?
-                """, self.database_id)
-            local_items = cursor.query_dict(
-                """
-                SELECT
-                    `remote_id`,
-                    `checksum`,
-                    `id`
-                FROM
-                    `items`
-                WHERE
-                    `items`.`database_id` = ?
-                """, self.database_id)
-            local_container_items = cursor.query_dict(
-                """
-                SELECT
-                    `item_id`
-                FROM
-                    `container_items`
-                WHERE
-                    `container_items`.`container_id` = ?
-                """, container_id)
+        def removed_ids(items):
+            for value in items.itervalues():
+                if "updated" not in value:
+                    yield value["id"]
 
-            # Compute local IDs
-            local_artists_ids = set(local_artists.iterkeys())
-            local_albums_ids = set(local_albums.iterkeys())
-            local_items_ids = set(local_items.iterkeys())
-            local_container_items_ids = set(local_container_items.iterkeys())
-
-            for item in self.walk_index():
-                remote_item_id = item["id"]
-
-                # Artist + Album information
-                if "artistId" in item:
-                    #
-                    # Artist information
-                    #
-                    remote_artist_id = item["artistId"]
-
-                    if remote_artist_id not in added_artists:
-                        artist_checksum = utils.dict_checksum(
-                            name=item["artist"])
-
-                        # Check if artist has changed
-                        if remote_artist_id not in local_artists:
-                            cursor.query(
-                                """
-                                INSERT INTO `artists` (
-                                    `database_id`,
-                                    `name`,
-                                    `remote_id`,
-                                    `checksum`)
-                                VALUES
-                                    (?, ?, ?, ?)
-                                """,
-                                self.database_id,
-                                item["artist"],
-                                remote_artist_id,
-                                artist_checksum)
-
-                            # Store insert ID
-                            local_artists[remote_artist_id] = (
-                                artist_checksum, cursor.lastrowid)
-                        elif artist_checksum != local_artists[remote_artist_id][0]:
-                            cursor.query(
-                                """
-                                UPDATE
-                                    `artists`
-                                SET
-                                    `name` = ?,
-                                    `checksum` = ?
-                                WHERE
-                                    `artists`.`id` = ?
-                                """,
-                                item["artist"],
-                                artist_checksum,
-                                local_artists[remote_artist_id][1])
-
-                        # Mark as added/edited, so it won't be processed again.
-                        added_artists.add(remote_artist_id)
-
-                        #
-                        # Album information
-                        #
-                        for album in self.walk_artist(remote_artist_id):
-                            remote_album_id = album["id"]
-
-                            # Synchronize artist information
-                            if remote_album_id not in added_albums:
-                                album_checksum = utils.dict_checksum(album)
-
-                                # Check if artist has changed
-                                if remote_album_id not in local_albums:
-                                    cursor.query(
-                                        """
-                                        INSERT INTO `albums` (
-                                           `database_id`,
-                                           `artist_id`,
-                                           `name`,
-                                           `art`,
-                                           `remote_id`,
-                                           `checksum`)
-                                        VALUES
-                                           (?, ?, ?, ?, ?, ?)
-                                        """,
-                                        self.database_id,
-                                        local_artists[remote_artist_id][1],
-                                        album["name"],
-                                        int("coverArt" in album),
-                                        remote_album_id,
-                                        album_checksum)
-
-                                    # Store insert ID
-                                    local_albums[remote_album_id] = (
-                                        album_checksum, cursor.lastrowid)
-                                elif album_checksum != local_albums[remote_album_id][0]:
-                                    cursor.query(
-                                        """
-                                        UPDATE
-                                            `albums`
-                                        SET
-                                           `name` = ?,
-                                           `art` = ?,
-                                           `checksum` = ?
-                                        WHERE
-                                            `albums`.`id` = ?
-                                        """,
-                                        album["name"],
-                                        int("coverArt" in album),
-                                        album_checksum,
-                                        local_albums[remote_album_id][1])
-
-                                # Mark as added/edited, so it won't be processed
-                                # again.
-                                added_albums.add(remote_album_id)
-
-                #
-                # Item information
-                #
-                if remote_item_id not in added_items:
-                    item_checksum = utils.dict_checksum(item)
-
-                    try:
-                        item_artist_id = local_artists[item["artistId"]][1]
-                    except KeyError:
-                        item_artist_id = None
-                    try:
-                        item_album_id = local_albums[item["albumId"]][1]
-                    except KeyError:
-                        item_album_id = None
-                    try:
-                        item_duration = item["duration"] * 1000
-                    except KeyError:
-                        item_duration = None
-
-                    # Check if item has changed
-                    if remote_item_id not in local_items:
-                        cursor.query(
-                            """
-                            INSERT INTO `items` (
-                                `persistent_id`,
-                                `database_id`,
-                                `artist_id`,
-                                `album_id`,
-                                `name`,
-                                `genre`,
-                                `year`,
-                                `track`,
-                                `duration`,
-                                `bitrate`,
-                                `file_name`,
-                                `file_type`,
-                                `file_suffix`,
-                                `file_size`,
-                                `remote_id`,
-                                `checksum`)
-                            VALUES
-                                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            generate_persistent_id(),
-                            self.database_id,
-                            item_artist_id,
-                            item_album_id,
-                            item.get("title"),
-                            item.get("genre"),
-                            item.get("year"),
-                            item.get("track"),
-                            item_duration,
-                            item.get("bitRate"),
-                            item.get("path"),
-                            item.get("contentType"),
-                            item.get("suffix"),
-                            item.get("size"),
-                            remote_item_id,
-                            item_checksum)
-
-                        # Store insert ID
-                        local_items[remote_item_id] = (
-                            item_checksum, cursor.lastrowid)
-                    elif item_checksum != local_items[remote_item_id][0]:
-                        cursor.query(
-                            """
-                            UPDATE
-                                `items`
-                            SET
-                                `artist_id` = ?,
-                                `album_id` = ?,
-                                `name` = ?,
-                                `genre` = ?,
-                                `year` = ?,
-                                `track` = ?,
-                                `duration` = ?,
-                                `bitrate` = ?,
-                                `file_name` = ?,
-                                `file_type` = ?,
-                                `file_suffix` = ?,
-                                `file_size` = ?,
-                                `checksum` = ?
-                            WHERE
-                                `items`.`id` = ?
-                            """,
-                            item_artist_id,
-                            item_album_id,
-                            item.get("title"),
-                            item.get("genre"),
-                            item.get("year"),
-                            item.get("track"),
-                            item_duration,
-                            item.get("bitRate"),
-                            item.get("path"),
-                            item.get("contentType"),
-                            item.get("suffix"),
-                            item.get("size"),
-                            item_checksum,
-                            local_items[remote_item_id][1])
-
-                    # Mark as added/edited, so it won't be processed again.
-                    added_items.add(remote_item_id)
-
-                #
-                # Container item information
-                #
-                if local_items[remote_item_id][1] not in local_container_items:
-                    cursor.query(
-                        """
-                        INSERT INTO `container_items` (
-                            `database_id`,
-                            `container_id`,
-                            `item_id`)
-                        VALUES
-                            (?, ?, ?)
-                        """,
-                        self.database_id,
-                        container_id,
-                        local_items[remote_item_id][1])
-
-                    # Store insert ID
-                    local_container_items[local_items[remote_item_id][1]] = ()
-
-                # Mark as added/edites, so it won't be processed again.
-                added_container_items.add(local_items[remote_item_id][1])
-
-            # Calculate deleted artists
-            deleted_artists = local_artists_ids - added_artists
-            deleted_albums = local_albums_ids - added_albums
-            deleted_items = local_items_ids - added_items
-            deleted_container_items = local_container_items_ids - \
-                added_container_items
-
-            # Delete old artists, albums and items
-            cursor.query("""
-                DELETE FROM
-                    `container_items`
-                WHERE
-                    `container_items`.`item_id` IN (%s) AND
-                    `container_items`.`container_id` = ?
-                """ % utils.in_list(deleted_container_items), container_id)
-            cursor.query("""
-                DELETE FROM
-                    `items`
-                WHERE
-                    `items`.`remote_id` IN (%s) AND
-                    `items`.`database_id` = ?
-                """ % utils.in_list(deleted_items), self.database_id)
-            cursor.query("""
-                DELETE FROM
-                    `artists`
-                WHERE
-                    `artists`.`remote_id` IN (%s) AND
-                    `artists`.`database_id` = ?
-                """ % utils.in_list(deleted_artists), self.database_id)
-            cursor.query("""
-                DELETE FROM
-                    `albums`
-                WHERE
-                    `albums`.`remote_id` IN (%s) AND
-                    `albums`.`database_id` = ?
-                """ % utils.in_list(deleted_albums), self.database_id)
-
-            # Return all additions and deletions
-            return \
-                added_artists, deleted_artists, \
-                added_albums, deleted_albums, \
-                added_items, deleted_items, \
-                added_container_items, deleted_container_items
-
-    def sync_playlists(self):
-        """
-        """
-
-        added_containers = set()
-
-        with self.db.get_write_cursor() as cursor:
-            # Fetch local database ID
-            database_id = self.database_id
-
-            container_id = cursor.query_value(
-                """
-                SELECT
-                    `containers`.`id`
-                FROM
-                    `containers`
-                WHERE
-                    `containers`.`is_base` = 1 AND
-                    `containers`.`database_id` = ?
-                """,
-                database_id)
-            local_containers = cursor.query_dict(
-                """
-                SELECT
-                    `remote_id`,
-                    `checksum`,
-                    `id`
-                FROM
-                    `containers`
-                WHERE
-                    `containers`.`is_base` = 0 AND
-                    `containers`.`database_id` = ?
-                """,
-                database_id)
-
-            # Compute local IDs
-            local_containers_ids = set(local_containers.iterkeys())
-
-            for container in self.walk_playlists():
-                remote_container_id = container["id"]
-
-                if remote_container_id not in added_containers:
-                    container_checksum = utils.dict_checksum(
-                        is_base=0, name=container["name"],
-                        song_count=container["songCount"])
-
-                    # Check if container has changed
-                    if remote_container_id not in local_containers_ids:
-                        cursor = cursor.query(
-                            """
-                            INSERT INTO `containers` (
-                               `persistent_id`,
-                               `database_id`,
-                               `parent_id`,
-                               `name`,
-                               `is_base`,
-                               `is_smart`,
-                               `remote_id`,
-                               `checksum`)
-                            VALUES
-                               (?, ?, ?, ?, ?, ?, ?, ?)
-                            """,
-                            generate_persistent_id(),
-                            self.database_id,
-                            container_id,
-                            container["name"],
-                            int(False),
-                            int(False),
-                            remote_container_id,
-                            container_checksum)
-
-                        # Store insert ID
-                        local_containers[remote_container_id] = (
-                            container_checksum, cursor.lastrowid)
-                    elif container_checksum != local_containers[remote_container_id][0]:
-                        cursor.query(
-                            """
-                            UPDATE
-                                `containers`
-                            SET
-                                `name` = ?,
-                                `checksum` = ?
-                            WHERE
-                                `containers`.`id` = ?
-                            """,
-                            container["name"],
-                            container_checksum,
-                            local_containers[remote_container_id][1])
-
-                    # Sync playlist items
-                    self.sync_playlist_items(
-                        container,
-                        local_containers[remote_container_id][1],
-                        cursor)
-
-                    # Mark as added/edited, so it won't be processed again
-                    added_containers.add(remote_container_id)
-
-            deleted_containers = local_containers_ids - added_containers
-
-            # Delete old containers
-            cursor.query(
-                """
-                DELETE FROM
-                    `containers`
-                WHERE
-                    `containers`.`id` IN (%s) AND
-                    `containers`.`database_id` = ?
-                """ % utils.in_list(deleted_containers), database_id)
-
-            return added_containers, deleted_containers
-
-    def sync_playlist_items(self, playlist, container_id, cursor):
-        """
-        """
-
-        database_id = self.database_id
-
-        cursor.query(
-            """
-            DELETE FROM
-                `container_items`
-            WHERE
-                `container_items`.`container_id` = ? AND
-                `container_items`.`database_id` = ?
-            """, container_id, database_id)
-
-        remote_items = set()
-
-        for entry in self.walk_playlist_entries(playlist["id"]):
-            remote_items.add(entry["id"])
-
-        local_items = cursor.query_dict(
+        # Index database by IDs
+        self.items_by_remote_id = self.cursor.query_dict(
             """
             SELECT
                 `items`.`remote_id`,
-                `items`.`id`
+                `items`.`id`,
+                `items`.`checksum`
             FROM
                 `items`
             WHERE
-                `items`.`remote_id` IN (%s) AND
                 `items`.`database_id` = ?
-            """ % utils.in_list(set(remote_items)), database_id)
+            """, self.database_id)
+        self.artists_by_remote_id = self.cursor.query_dict(
+            """
+            SELECT
+                `artists`.`remote_id`,
+                `artists`.`id`,
+                `artists`.`checksum`
+            FROM
+                `artists`
+            WHERE
+                `artists`.`database_id` = ?
+            """, self.database_id)
+        self.albums_by_remote_id = self.cursor.query_dict(
+            """
+            SELECT
+                `albums`.`remote_id`,
+                `albums`.`id`,
+                `albums`.`checksum`
+            FROM
+                `albums`
+            WHERE
+                `albums`.`database_id` = ?
+            """, self.database_id)
+        self.base_container_items_by_item_id = self.cursor.query_dict(
+            """
+            SELECT
+                `container_items`.`item_id`,
+                `container_items`.`id`
+            FROM
+                `container_items`
+            WHERE
+                `container_items`.`container_id` = ?
+            """, self.base_container_id)
 
-        for entry in self.walk_playlist_entries(playlist["id"]):
-            cursor.query(
+        # Iterate over each item, sync artist, album, item and container item.
+        for item in self.walk_index():
+            if "artistId" in item:
+                if not is_artist_processed(item):
+                    self.sync_artist(item)
+
+                    for album in self.walk_artist(item["artistId"]):
+                        if not is_album_processed(album):
+                            self.sync_album(album)
+
+            self.sync_item(item)
+            self.sync_base_container_item(item)
+
+        # Delete old artist, albums, items and container items
+        self.cursor.query("""
+            DELETE FROM
+                `container_items`
+            WHERE
+                `container_items`.`id` IN (%s)
+            """ % utils.in_list(removed_ids(self.base_container_items_by_item_id)))
+        self.cursor.query("""
+            DELETE FROM
+                `items`
+            WHERE
+                `items`.`id` IN (%s)
+            """ % utils.in_list(removed_ids(self.items_by_remote_id)))
+        self.cursor.query("""
+            DELETE FROM
+                `artists`
+            WHERE
+                `artists`.`id` IN (%s)
+            """ % utils.in_list(removed_ids(self.artists_by_remote_id)))
+        self.cursor.query("""
+            DELETE FROM
+                `albums`
+            WHERE
+                `albums`.`id` IN (%s)
+            """ % utils.in_list(removed_ids(self.albums_by_remote_id)))
+
+    def sync_item(self, item):
+        """
+        """
+
+        checksum = utils.dict_checksum(item)
+        artist = self.artists_by_remote_id.get(item.get("artistId"))
+        album = self.albums_by_remote_id.get(item.get("albumId"))
+
+        # Fetch existing item
+        try:
+            row = self.items_by_remote_id[item["id"]]
+        except KeyError:
+            row = None
+
+        # To insert or to update
+        updated = True
+
+        if row is None:
+            item_id = self.cursor.query(
+                """
+                INSERT INTO `items` (
+                    `persistent_id`,
+                    `database_id`,
+                    `artist_id`,
+                    `album_id`,
+                    `name`,
+                    `genre`,
+                    `year`,
+                    `track`,
+                    `duration`,
+                    `bitrate`,
+                    `file_name`,
+                    `file_type`,
+                    `file_suffix`,
+                    `file_size`,
+                    `checksum`,
+                    `remote_id`)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                generate_persistent_id(),
+                self.database_id,
+                artist["id"] if artist else None,
+                album["id"] if album else None,
+                item.get("title"),
+                item.get("genre"),
+                item.get("year"),
+                item.get("track"),
+                item["duration"] * 1000 if "duration" in item else None,
+                item.get("bitRate"),
+                item.get("path"),
+                item.get("contentType"),
+                item.get("suffix"),
+                item.get("size"),
+                checksum,
+                item["id"]).lastrowid
+        elif row["checksum"] != checksum:
+            item_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `items`
+                SET
+                    `artist_id` = ?,
+                    `album_id` = ?,
+                    `name` = ?,
+                    `genre` = ?,
+                    `year` = ?,
+                    `track` = ?,
+                    `duration` = ?,
+                    `bitrate` = ?,
+                    `file_name` = ?,
+                    `file_type` = ?,
+                    `file_suffix` = ?,
+                    `file_size` = ?,
+                    `checksum` = ?
+                WHERE
+                    `items`.`id` = ?
+                """,
+                artist["id"] if artist else None,
+                album["id"] if album else None,
+                item.get("title"),
+                item.get("genre"),
+                item.get("year"),
+                item.get("track"),
+                item["duration"] * 1000 if "duration" in item else None,
+                item.get("bitRate"),
+                item.get("path"),
+                item.get("contentType"),
+                item.get("suffix"),
+                item.get("size"),
+                checksum,
+                item_id)
+        else:
+            updated = False
+            item_id = row["id"]
+
+        # Update cache
+        self.items_by_remote_id[item["id"]] = {
+            "remote_id": item["id"],
+            "id": item_id,
+            "checksum": checksum,
+            "updated": updated
+        }
+
+    def sync_base_container_item(self, item):
+        """
+        """
+
+        item_row = self.items_by_remote_id[item["id"]]
+
+        # Fetch existing item
+        try:
+            row = self.base_container_items_by_item_id[item_row["id"]]
+        except KeyError:
+            row = None
+
+        # To insert or not
+        updated = False
+
+        if row is None:
+            updated = True
+            base_container_item_id = self.cursor.query(
                 """
                 INSERT INTO `container_items` (
                     `database_id`,
                     `container_id`,
-                    `item_id`,
-                    `order`)
+                    `item_id`)
+                VALUES
+                    (?, ?, ?)
+                """,
+                self.database_id,
+                self.base_container_id,
+                item_row["id"]).lastrowid
+        else:
+            base_container_item_id = row["id"]
+
+        # Update cache
+        self.base_container_items_by_item_id[item_row["id"]] = {
+            "item_id": item_row["id"],
+            "id": base_container_item_id,
+            "updated": updated
+        }
+
+    def sync_artist(self, item):
+        """
+        """
+
+        checksum = utils.dict_checksum(name=item["artist"])
+
+        # Fetch existing item
+        try:
+            row = self.artists_by_remote_id[item["artistId"]]
+        except KeyError:
+            row = None
+
+        # To insert or to update
+        updated = True
+
+        if row is None:
+            artist_id = self.cursor.query(
+                """
+                INSERT INTO `artists` (
+                    `database_id`,
+                    `name`,
+                    `remote_id`,
+                    `checksum`)
                 VALUES
                     (?, ?, ?, ?)
                 """,
-                database_id,
-                container_id,
-                local_items[entry["id"]][0],
-                entry["order"])
+                self.database_id,
+                item["artist"],
+                item["artistId"],
+                checksum).lastrowid
+        elif row["checksum"] != checksum:
+            artist_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `artists`
+                SET
+                    `name` = ?,
+                    `checksum` = ?
+                WHERE
+                    `artists`.`id` = ?
+                """,
+                item["artist"],
+                checksum,
+                artist_id)
+        else:
+            updated = False
+            artist_id = row["id"]
+
+        # Update cache
+        self.artists_by_remote_id[item["artistId"]] = {
+            "remote_id": item["artistId"],
+            "id": artist_id,
+            "checksum": checksum,
+            "updated": updated
+        }
+
+    def sync_album(self, album):
+        """
+        """
+
+        checksum = utils.dict_checksum(album)
+        artist_row = self.artists_by_remote_id.get(album.get("artistId"))
+
+        # Fetch existing item
+        try:
+            row = self.albums_by_remote_id[album["id"]]
+        except KeyError:
+            row = None
+
+        # To insert or to update
+        updated = True
+
+        if row is None:
+            album_id = self.cursor.query(
+                """
+                INSERT INTO `albums` (
+                   `database_id`,
+                   `artist_id`,
+                   `name`,
+                   `art`,
+                   `checksum`,
+                   `remote_id`)
+                VALUES
+                   (?, ?, ?, ?, ?, ?)
+                """,
+                self.database_id,
+                artist_row["id"] if artist_row else None,
+                album["name"],
+                "coverArt" in album,
+                checksum,
+                album["id"]).lastrowid
+        elif row["checksum"] != checksum:
+            album_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `albums`
+                SET
+                   `name` = ?,
+                   `art` = ?,
+                   `checksum` = ?
+                WHERE
+                    `albums`.`id` = ?
+                """,
+                album["artist"],
+                "coverArt" in album,
+                checksum,
+                album_id)
+        else:
+            updated = False
+            album_id = row["id"]
+
+        # Update cache
+        self.albums_by_remote_id[album["id"]] = {
+            "remote_id": album["id"],
+            "id": album_id,
+            "checksum": checksum,
+            "updated": updated
+        }
+
+    def sync_containers(self):
+        pass
+
+    def sync_container(self):
+        pass
+
+    def sync_container_items(self, container):
+        pass
+
+    def sync_container_item(self, container_item):
+        pass
 
     def walk_index(self):
         """
@@ -754,9 +597,16 @@ class Synchronizer(object):
                 for item in self.walk_directory(index["id"]):
                     yield item
 
+        for child in response["indexes"]["child"]:
+            if child.get("isDir"):
+                for child in self.walk_directory(child["id"]):
+                    yield child
+            else:
+                yield child
+
     def walk_playlists(self):
         """
-        Request SubSonic's playlists and iterate each item.
+        Request SubSonic's playlists and iterate over each item.
         """
 
         response = self.cache.get("playlists") or \
@@ -765,9 +615,9 @@ class Synchronizer(object):
         for child in response["playlists"]["playlist"]:
             yield child
 
-    def walk_playlist_entries(self, playlist_id):
+    def walk_playlist(self, playlist_id):
         """
-        Request SubSonic's playlist items and iterate each item.
+        Request SubSonic's playlist items and iterate over each item.
         """
 
         response = self.cache.get("playlist_%d" % playlist_id) or \
@@ -779,7 +629,7 @@ class Synchronizer(object):
 
     def walk_directory(self, directory_id):
         """
-        Request a SubSonic music directory and iterate each item.
+        Request a SubSonic music directory and iterate over each item.
         """
 
         response = self.connection.getMusicDirectory(directory_id)
@@ -793,7 +643,7 @@ class Synchronizer(object):
 
     def walk_artist(self, artist_id):
         """
-        Request a SubSonic artist and iterate each album.
+        Request a SubSonic artist and iterate over each album.
         """
 
         response = self.connection.getArtist(artist_id)

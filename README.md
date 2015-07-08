@@ -43,9 +43,6 @@ The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for 
 
 Add `--daemon` to run the program in the background.
 
-## Known issues
-* Gevent may throw `Broken Pipe' exceptions. This is a known issue and can be ignored. See https://github.com/surfly/gevent/pull/377 for more information.
-
 ## License
 See the `LICENSE` file (MIT license).
 

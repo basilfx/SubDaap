@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.0.0
+Released XX July 2015
+
+Highlights:
+* Improved: better synchronization
+* Upgraded: flask-daapserver v3.0.0
+* Upgraded: gevent v1.1
+
+The full list of commits can be found [here](https://github.com/basilfx/flask-daapserver/compare/v1.2.0...v2.0.0).
+
 ## v1.2.0
 Released 05 April 2015
 

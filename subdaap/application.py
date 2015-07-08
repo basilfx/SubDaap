@@ -54,8 +54,7 @@ class Application(object):
         db = Database(self.config["Provider"]["database"])
 
         # Setup state
-        state = State(os.path.join(
-            self.get_cache_dir(), "provider.state"))
+        state = State(os.path.join(self.get_cache_dir(), "provider.state"))
 
         # Initialize connections.
         connections = {}
