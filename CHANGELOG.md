@@ -5,6 +5,7 @@ Released XX July 2015
 
 Highlights:
 * Improved: better synchronization
+* Improved: live revisioning
 * Upgraded: flask-daapserver v3.0.0
 * Upgraded: gevent v1.1
 
