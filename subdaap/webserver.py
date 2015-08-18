@@ -1,5 +1,6 @@
 from subdaap import utils
 
+from flask import Response
 from flask import render_template, redirect, url_for, send_from_directory
 
 import logging
@@ -89,3 +90,14 @@ def extend_server_app(application, app):
 
         # Return back to index
         return redirect(url_for("index"))
+
+    @app.route("/raw/tree")
+    @app.authenticate
+    def raw_tree():
+        """
+        Print a raw tree of the current server storage.
+        """
+
+        generator = (x + "\n" for x in application.provider.server.to_tree())
+
+        return Response(generator, mimetype="text/plain")
