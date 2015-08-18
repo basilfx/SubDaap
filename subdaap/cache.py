@@ -84,17 +84,21 @@ class FileCache(object):
 
                 permanent = cache_key in permanent_cache_keys
 
-                self.items[cache_key] = FileCacheItem()
-                self.items[cache_key].size = os.stat(cache_file).st_size
-                self.items[cache_key].permanent = permanent
+                if cache_key not in self.items:
+                    self.items[cache_key] = FileCacheItem()
+                    self.items[cache_key].size = os.stat(cache_file).st_size
+                    self.items[cache_key].permanent = permanent
 
         # Sum sizes of all non-permanent files
+        size = 0
         count = 0
 
         for item in self.items.itervalues():
             if not item.permanent:
-                self.current_size += item.size
+                size += item.size
                 count += 1
+
+        self.current_size = size
 
         logger.debug(
             "%s: %d files in cache (%d permanent), size is %s/%s",
