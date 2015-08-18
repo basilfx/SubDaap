@@ -8,7 +8,7 @@ def patch_pypy():
 
     # Check if running under PyPY
     try:
-        import __pypy__ # noqa
+        import __pypy__  # noqa
     except ImportError:
         return
 
