@@ -3,14 +3,9 @@ from daapserver import collection
 from subdaap import utils
 
 
-class MutableCollection(collection.MutableCollection):
+class LazyMutableCollection(collection.LazyMutableCollection):
 
-    def __init__(self, *args, **kwargs):
-        super(MutableCollection, self).__init__(*args, **kwargs)
-
-        self.ready = self.revision != -1
-        self.busy = False
-        self.iter_item = None
+    __slots__ = collection.LazyMutableCollection.__slots__ + ("child_class", )
 
     def count(self):
         """
@@ -206,9 +201,14 @@ class MutableCollection(collection.MutableCollection):
             with self.parent.db.get_cursor() as cursor:
                 for rows in utils.chunks(cursor.query(*query), 25):
                     for row in rows:
-                        # Create new instance from a row. Note that since the
-                        # instance is slotted, the row keys should match!
-                        item = child_class(db, **row)
+                        # Update an existing item
+                        if item_ids:
+                            item = store.get(row["id"])
+
+                            for key in row.keys():
+                                setattr(item, key, row[key])
+                        else:
+                            item = child_class(db, **row)
 
                         # Add to store
                         store.add(item.id, item)
@@ -217,88 +217,13 @@ class MutableCollection(collection.MutableCollection):
                         self.iter_item = item
                         yield item
 
-                # Mark as done
-                if not item_ids:
-                    self.ready = True
+            # Final actions after all items have been loaded
+            if not item_ids:
+                self.ready = True
+
+                if self.pending_commit != -1:
+                    revision = self.pending_commit
+                    self.pending_commit = -1
+                    self.commit(revision)
         finally:
             self.busy = False
-
-    def update_ids(self, item_ids):
-        """
-        """
-
-        # Don't update if this instance isn't ready.
-        if not self.ready:
-            return
-
-        utils.exhaust(self.load(item_ids))
-
-    def remove_ids(self, item_ids):
-        """
-        """
-
-        # Don't remove items if this instance isn't ready.
-        if not self.ready:
-            return
-
-        for item_id in item_ids:
-            self.store.remove(item_id)
-
-    def commit(self, revision):
-        """
-        """
-
-        super(MutableCollection, self).commit(revision)
-        self.ready = False
-
-    def __contains__(self, key):
-        """
-        """
-
-        if not self.ready:
-            utils.exhaust(self.load())
-
-        return super(MutableCollection, self).__contains__(key)
-
-    def __len__(self):
-        """
-        """
-
-        if not self.ready:
-            return self.count()
-
-        return super(MutableCollection, self).__len__()
-
-    def __getitem__(self, key):
-        """
-        """
-
-        if self.busy and self.iter_item.id == key:
-            return self.iter_item
-
-        if not self.ready:
-            utils.exhaust(self.load())
-
-        return super(MutableCollection, self).__getitem__(key)
-
-    def iterkeys(self):
-        """
-        """
-
-        if not self.ready:
-            for item in self.load():
-                yield item.id
-        else:
-            for key in super(MutableCollection, self).iterkeys():
-                yield key
-
-    def itervalues(self):
-        """
-        """
-
-        if not self.ready:
-            for item in self.load():
-                yield item
-        else:
-            for item in super(MutableCollection, self).itervalues():
-                yield item

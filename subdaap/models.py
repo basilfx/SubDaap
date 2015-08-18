@@ -1,6 +1,6 @@
 from daapserver import models
 
-from subdaap.collection import MutableCollection
+from subdaap.collection import LazyMutableCollection
 
 
 class Server(models.Server):
@@ -10,7 +10,7 @@ class Server(models.Server):
 
     __slots__ = models.Server.__slots__ + ("db", )
 
-    databases_collection_class = MutableCollection
+    databases_collection_class = LazyMutableCollection
 
     def __init__(self, db, *args, **kwargs):
         super(Server, self).__init__(*args, **kwargs)
@@ -48,8 +48,8 @@ class Database(models.Database):
 
     __slots__ = models.Database.__slots__ + ("db", )
 
-    items_collection_class = MutableCollection
-    containers_collection_class = MutableCollection
+    items_collection_class = LazyMutableCollection
+    containers_collection_class = LazyMutableCollection
 
     def __init__(self, db, *args, **kwargs):
         super(Database, self).__init__(*args, **kwargs)
@@ -78,7 +78,7 @@ class Container(models.Container):
 
     __slots__ = models.Container.__slots__ + ("db", )
 
-    container_items_collection_class = MutableCollection
+    container_items_collection_class = LazyMutableCollection
 
     def __init__(self, db, *args, **kwargs):
         super(Container, self).__init__(*args, **kwargs)
