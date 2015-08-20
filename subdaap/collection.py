@@ -203,10 +203,13 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                     for row in rows:
                         # Update an existing item
                         if item_ids:
-                            item = store.get(row["id"])
+                            try:
+                                item = store.get(row["id"])
 
-                            for key in row.keys():
-                                setattr(item, key, row[key])
+                                for key in row.keys():
+                                    setattr(item, key, row[key])
+                            except KeyError:
+                                item = child_class(db, **row)
                         else:
                             item = child_class(db, **row)
 
