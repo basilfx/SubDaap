@@ -65,17 +65,27 @@ class Synchronizer(object):
         # Update the server
         server = self.server
 
+        # Databases
         server.databases.update_ids([self.database_id])
+
+        # Items
         database = server.databases[self.database_id]
         database.items.update_ids(updated_ids(self.items_by_remote_id))
         database.items.remove_ids(removed_ids(self.items_by_remote_id))
 
+        # Base container and container items
         database.containers.update_ids([self.base_container_id])
         base_container = database.containers[self.base_container_id]
         base_container.container_items.update_ids(
             updated_ids(self.base_container_items_by_item_id))
         base_container.container_items.remove_ids(
             removed_ids(self.base_container_items_by_item_id))
+
+        # Other containers and container items
+        database.containers.update_ids(
+            updated_ids(self.containers_by_remote_id))
+        database.containers.remove_ids(
+            removed_ids(self.containers_by_remote_id))
 
     def sync_database(self):
         """
@@ -224,7 +234,7 @@ class Synchronizer(object):
                 if "updated" not in value:
                     yield value["id"]
 
-        # Index database by IDs
+        # Index items, artists, albums and container items by remote IDs.
         self.items_by_remote_id = self.cursor.query_dict(
             """
             SELECT
@@ -574,16 +584,118 @@ class Synchronizer(object):
         }
 
     def sync_containers(self):
-        pass
+        """
+        """
 
-    def sync_container(self):
-        pass
+        def removed_ids(items):
+            for value in items.itervalues():
+                if "updated" not in value:
+                    yield value["id"]
+
+        # Index containers by remote IDs.
+        self.containers_by_remote_id = self.cursor.query_dict(
+            """
+            SELECT
+                `containers`.`remote_id`,
+                `containers`.`id`,
+                `containers`.`checksum`
+            FROM
+                `containers`
+            WHERE
+                `containers`.`database_id` = ? AND NOT
+                `containers`.`id` = ?
+            """, self.database_id, self.base_container_id)
+
+        # Iterate over each playlist.
+        for container in self.walk_playlists():
+            self.sync_container(container)
+
+        # Delete old containers and container items.
+        self.cursor.query("""
+            DELETE FROM
+                `containers`
+            WHERE
+                `containers`.`id` IN (%s)
+            """ % utils.in_list(removed_ids(self.containers_by_remote_id)))
+
+    def sync_container(self, container):
+        """
+        """
+
+        checksum = utils.dict_checksum(
+            is_base=False, name=container["name"],
+            song_count=container["songCount"])
+
+        # Fetch existing item
+        try:
+            row = self.containers_by_remote_id[container["id"]]
+        except KeyError:
+            row = None
+
+        # To insert or to update
+        updated = True
+
+        if row is None:
+            container_id = self.cursor.query(
+                """
+                INSERT INTO `containers` (
+                   `persistent_id`,
+                   `database_id`,
+                   `parent_id`,
+                   `name`,
+                   `is_base`,
+                   `is_smart`,
+                   `checksum`,
+                   `remote_id`)
+                VALUES
+                   (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                generate_persistent_id(),
+                self.database_id,
+                self.base_container_id,
+                container["name"],
+                False,
+                False,
+                checksum,
+                container["id"]).lastrowid
+        elif row["checksum"] != checksum:
+            container_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `containers`
+                SET
+                    `name` = ?,
+                    `is_base` = ?,
+                    `is_smart` = ?,
+                    `checksum` = ?
+                WHERE
+                    `containers`.`id` = ?
+                """,
+                container["name"],
+                False,
+                False,
+                checksum,
+                container_id)
+        else:
+            updated = False
+            container_id = row["id"]
+
+        # Update cache
+        self.containers_by_remote_id[container["id"]] = {
+            "remote_id": container["id"],
+            "id": container_id,
+            "checksum": checksum,
+            "updated": updated
+        }
 
     def sync_container_items(self, container):
-        pass
+        """
+        """
 
     def sync_container_item(self, container_item):
-        pass
+        """
+        """
 
     def walk_index(self):
         """
