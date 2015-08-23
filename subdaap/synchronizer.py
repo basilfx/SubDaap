@@ -21,6 +21,10 @@ class Synchronizer(object):
         self.connection = connection
         self.index = index
 
+        self.items_by_remote_id = {}
+        self.base_container_items_by_item_id = {}
+        self.containers_by_remote_id = {}
+
     def sync(self):
         """
         """
@@ -31,11 +35,21 @@ class Synchronizer(object):
                 self.cursor = cursor
                 self.cache = {}
 
+                # Determine version numbers
+                self.sync_versions()
+
                 # Start synchronizing
                 self.sync_database()
                 self.sync_base_container()
-                self.sync_items()
-                self.sync_containers()
+
+                if self.items_version != self.state.get("items_version"):
+                    self.sync_items()
+                    self.state["items_version"] = self.items_version
+
+                if self.containers_version != self.state.get(
+                        "containers_version"):
+                    self.sync_containers()
+                    self.state["containers_version"] = self.containers_version
 
             # Merge changes into the server
             self.update_server()
@@ -70,22 +84,69 @@ class Synchronizer(object):
 
         # Items
         database = server.databases[self.database_id]
-        database.items.update_ids(updated_ids(self.items_by_remote_id))
         database.items.remove_ids(removed_ids(self.items_by_remote_id))
+        database.items.update_ids(updated_ids(self.items_by_remote_id))
 
         # Base container and container items
         database.containers.update_ids([self.base_container_id])
         base_container = database.containers[self.base_container_id]
-        base_container.container_items.update_ids(
-            updated_ids(self.base_container_items_by_item_id))
         base_container.container_items.remove_ids(
             removed_ids(self.base_container_items_by_item_id))
+        base_container.container_items.update_ids(
+            updated_ids(self.base_container_items_by_item_id))
 
         # Other containers and container items
-        database.containers.update_ids(
-            updated_ids(self.containers_by_remote_id))
         database.containers.remove_ids(
             removed_ids(self.containers_by_remote_id))
+        database.containers.update_ids(
+            updated_ids(self.containers_by_remote_id))
+
+        for container in self.containers_by_remote_id.itervalues():
+            if "updated" not in container:
+                updated_ids = container["container_items"]
+                container = database.containers[container["id"]]
+
+                container.container_items.remove_ids(container.container_items)
+                container.container_items.update_ids(updated_ids)
+
+    def sync_versions(self):
+        """
+        Read the remote index and playlists. Return their versions, so it can
+        be decided if synchronization is required.
+        For the index, a `lastModified` field is available in SubSonic's
+        response message. This is not the case for playlists, so the naive
+        approach is to fetch all playlists, calulate a checksum and compare. A
+        request for a similar feature is addressed in
+        http://forum.subsonic.org/forum/viewtopic.php?f=3&t=13972.
+        Because the index and playlists are reused, they are stored in cache.
+        """
+
+        items_version = 0
+        containers_version = 0
+
+        # Items
+        self.cache["index"] = response = self.connection.getIndexes(
+            ifModifiedSince=self.state["items_version"])
+
+        if "lastModified" in response["indexes"]:
+            items_version = response["indexes"]["lastModified"]
+        else:
+            items_version = self.state["items_version"]
+
+        # Playlists
+        self.cache["playlists"] = response = self.connection.getPlaylists()
+
+        for playlist in response["playlists"]["playlist"]:
+            self.cache["playlist_%d" % playlist["id"]] = response = \
+                self.connection.getPlaylist(playlist["id"])
+
+            containers_checksum = utils.dict_checksum(response["playlist"])
+            containers_version = (containers_version + containers_checksum) \
+                % 0xFFFFFFFF
+
+        # Return version numbers
+        self.items_version = items_version
+        self.containers_version = containers_version
 
     def sync_database(self):
         """
@@ -298,7 +359,8 @@ class Synchronizer(object):
                 `container_items`
             WHERE
                 `container_items`.`id` IN (%s)
-            """ % utils.in_list(removed_ids(self.base_container_items_by_item_id)))
+            """ % utils.in_list(removed_ids(
+            self.base_container_items_by_item_id)))
         self.cursor.query("""
             DELETE FROM
                 `items`
@@ -609,6 +671,7 @@ class Synchronizer(object):
         # Iterate over each playlist.
         for container in self.walk_playlists():
             self.sync_container(container)
+            self.sync_container_items(container)
 
         # Delete old containers and container items.
         self.cursor.query("""
@@ -686,16 +749,52 @@ class Synchronizer(object):
             "remote_id": container["id"],
             "id": container_id,
             "checksum": checksum,
-            "updated": updated
+            "updated": updated,
+            "container_items": []
         }
 
     def sync_container_items(self, container):
         """
         """
 
-    def sync_container_item(self, container_item):
+        # Synchronizing container items is hard. There is no easy way to see
+        # what has changed between two containers. Therefore, start by deleting
+        # all container items and re-add every item in the specified order.
+        self.cursor.query("""
+            DELETE FROM
+                `container_items`
+            WHERE
+                `container_items`.`container_id` = ?
+            """, self.containers_by_remote_id[container["id"]]["id"])
+
+        for container_item in self.walk_playlist(container["id"]):
+            self.sync_container_item(container, container_item)
+
+    def sync_container_item(self, container, container_item):
         """
         """
+
+        item_row = self.items_by_remote_id[container_item["id"]]
+        container_id = self.containers_by_remote_id[container["id"]]["id"]
+
+        container_item_id = self.cursor.query(
+            """
+            INSERT INTO `container_items` (
+                `database_id`,
+                `container_id`,
+                `item_id`,
+                `order`)
+            VALUES
+                (?, ?, ?, ?)
+            """,
+            self.database_id,
+            container_id,
+            item_row["id"],
+            container_item["order"]).lastrowid
+
+        # Update cache
+        self.containers_by_remote_id[container["id"]][
+            "container_items"].append(container_item_id)
 
     def walk_index(self):
         """
