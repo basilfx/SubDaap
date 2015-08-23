@@ -20,6 +20,7 @@ class Database(object):
         logger.info("Loading database from %s.", database_file)
         self.connection = sqlite3.connect(database_file)
         self.connection.row_factory = sqlite3.Row
+        self.connection.text_factory = sqlite3.OptimizedUnicode
 
     @contextmanager
     def get_write_cursor(self):
