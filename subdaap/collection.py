@@ -60,7 +60,7 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 FROM
                     `container_items`
                 INNER JOIN
-                    `items` ON `container_items`.`id`=`items`.`id`
+                    `items` ON `container_items`.`item_id`=`items`.`id`
                 LEFT OUTER JOIN
                     `artists` ON `items`.`artist_id`=`artists`.`id`
                 LEFT OUTER JOIN
@@ -175,7 +175,7 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 FROM
                     `container_items`
                 INNER JOIN
-                    `items` ON `container_items`.`id` = `items`.`id`
+                    `items` ON `container_items`.`item_id` = `items`.`id`
                 LEFT OUTER JOIN
                     `artists` ON `items`.`artist_id` = `artists`.`id`
                 LEFT OUTER JOIN
