@@ -160,7 +160,6 @@ class SubSonicProvider(provider.Provider):
 
             # Commit new structure
             self.server.commit()
-            print "\n".join(self.server.to_tree())
             logger.info("New revision is %d", self.server.revision)
 
             # Wake-up clients who are waiting for updates.
