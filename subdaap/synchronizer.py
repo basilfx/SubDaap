@@ -21,10 +21,6 @@ class Synchronizer(object):
         self.connection = connection
         self.index = index
 
-        self.items_by_remote_id = {}
-        self.base_container_items_by_item_id = {}
-        self.containers_by_remote_id = {}
-
     def sync(self):
         """
         """
@@ -35,6 +31,11 @@ class Synchronizer(object):
                 self.cursor = cursor
                 self.cache = {}
 
+                # Prepare variables
+                self.items_by_remote_id = {}
+                self.base_container_items_by_item_id = {}
+                self.containers_by_remote_id = {}
+
                 # Determine version numbers
                 self.sync_versions()
 
@@ -42,14 +43,20 @@ class Synchronizer(object):
                 self.sync_database()
                 self.sync_base_container()
 
+                # Items
                 if self.items_version != self.state.get("items_version"):
                     self.sync_items()
                     self.state["items_version"] = self.items_version
+                else:
+                    logger.info("Items haven't been modified.")
 
+                # Containers
                 if self.containers_version != self.state.get(
                         "containers_version"):
                     self.sync_containers()
                     self.state["containers_version"] = self.containers_version
+                else:
+                    logger.info("Containers haven't been modified.")
 
             # Merge changes into the server
             self.update_server()
@@ -121,10 +128,17 @@ class Synchronizer(object):
         Because the index and playlists are reused, they are stored in cache.
         """
 
+        connection_version = 0
         items_version = 0
         containers_version = 0
 
-        # Items
+        # Connection version
+        connection_version = utils.dict_checksum(
+            baseUrl=self.connection.baseUrl, port=self.connection.port,
+            username=self.connection.username,
+            password=self.connection.password)
+
+        # Items version (last modified property)
         self.cache["index"] = response = self.connection.getIndexes(
             ifModifiedSince=self.state["items_version"])
 
@@ -145,6 +159,7 @@ class Synchronizer(object):
                 % 0xFFFFFFFF
 
         # Return version numbers
+        self.connection_version = connection_version
         self.items_version = items_version
         self.containers_version = containers_version
 
