@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Config file specification
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
 CONFIG_SPEC = """
 version = integer(min=1, default=%d)
 
@@ -19,6 +19,9 @@ version = integer(min=1, default=%d)
 url = string
 username = string
 password = string
+
+synchronization = option("manual", "startup", "interval", default="interval")
+synchronization interval = integer(min=1, default=1440)
 
 [Daap]
 interface = string(default="0.0.0.0")

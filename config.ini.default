@@ -19,6 +19,14 @@ username = TODO
 # Password
 password = TODO
 
+# Define the synchronization method (default is 'interval'). Valid choices are
+# 'manual', 'startup' and 'interval'.
+# synchronization = manual
+
+# Minutes between two synchronizations (default is 1440). Only valid if
+# synchronization method is set to 'interval'.
+# synchronization interval = 300
+
 
 [Daap]
 
