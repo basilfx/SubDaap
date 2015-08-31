@@ -15,7 +15,7 @@ This project is an early and experimental version. I use it for my personal libr
 * Revision support: efficient library updates pushed to all connected clients.
 
 ## Requirements
-* Python 2.7+ (not Python 3.x). PyPy 2.4 works and is a lot faster.
+* Python 2.7+ (not Python 3.x). PyPy 2.5+ may work.
 * SubSonic 5.2+
 
 ## Installation

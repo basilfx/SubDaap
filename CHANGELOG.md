@@ -1,7 +1,7 @@
 # Changelog
 
 ## v2.0.0
-Released XX July 2015
+Released XX September 2015
 
 Highlights:
 * Improved: better synchronization
