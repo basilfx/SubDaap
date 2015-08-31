@@ -139,7 +139,7 @@ def daemonize(pid_file=None):
 
 def main():
     """
-    Main entry point. Parses arguments, daemonize and creates the application.
+    Main entry point. Parses arguments, daemonizes and creates the application.
     """
 
     # Parse arguments and configure application instance.
@@ -156,11 +156,17 @@ def main():
     # Create application instance and run it.
     try:
         application = Application(
-            config_file=arguments.config_file, data_dir=arguments.data_dir,
+            config_file=arguments.config_file,
+            data_dir=arguments.data_dir,
             verbose=arguments.verbose)
     except Exception as e:
-        logger.error("One or more components failed to initialize: %s", e)
-        raise
+        logger.error(
+            "One or more components failed to initialize: %s. The application "
+            "will now exit.", e)
+
+        if arguments.verbose > 1:
+            logger.exception("Stack trace")
+
         return 1
 
     try:
