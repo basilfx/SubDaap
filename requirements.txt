@@ -2,3 +2,4 @@ Cython
 py-sonic
 configobj
 flask-daapserver
+apscheduler
