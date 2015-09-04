@@ -144,7 +144,7 @@ class Application(object):
             os.path.join(self.data_dir, *path)))
         logger.debug("Resolved %s to %s", path, full_path)
 
-        # Create path if required
+        # Create path if required.
         try:
             os.makedirs(full_path, 0755)
         except OSError as e:
@@ -153,7 +153,7 @@ class Application(object):
             else:
                 raise Exception("Could not create folder: %s" % full_path)
 
-        # Test for writing
+        # Test for writing.
         ok = True
         test_file = os.path.join(full_path, ".write-test")
 
@@ -174,5 +174,5 @@ class Application(object):
         if not ok:
             raise Exception("Could not write to cache folder: %s" % full_path)
 
-        # Cache directory created and tested for writing
+        # Cache directory created and tested for writing.
         return full_path

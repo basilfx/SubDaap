@@ -95,7 +95,8 @@ def extend_server_app(application, app):
     @app.authenticate
     def raw_tree():
         """
-        Print a raw tree of the current server storage.
+        Print a raw tree of the current server storage. This method streams,
+        because the result can be huge.
         """
 
         generator = (x + "\n" for x in application.provider.server.to_tree())
