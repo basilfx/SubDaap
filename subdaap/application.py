@@ -6,6 +6,7 @@ from subdaap import cache, config, webserver
 from daapserver import DaapServer
 
 import logging
+import random
 import errno
 import os
 
@@ -153,8 +154,11 @@ class Application(object):
                 raise Exception("Could not create folder: %s" % full_path)
 
         # Test for writing
-        test_file = os.path.join(full_path, ".write-test")
         ok = True
+        test_file = os.path.join(full_path, ".write-test")
+
+        while os.path.exists(test_file):
+            test_file = test_file + str(random.randint(0, 9))
 
         try:
             with open(test_file, "w") as fp:
