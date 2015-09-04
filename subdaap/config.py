@@ -13,7 +13,7 @@ CONFIG_VERSION = 3
 CONFIG_SPEC = """
 version = integer(min=1, default=%d)
 
-[SubSonic]
+[Connections]
 
 [[__many__]]
 url = string
@@ -22,6 +22,9 @@ password = string
 
 synchronization = option("manual", "startup", "interval", default="interval")
 synchronization interval = integer(min=1, default=1440)
+
+transcode = option("no", "unsupported", "all", default="no")
+transcode unsupported = list(default=list("flac"))
 
 [Daap]
 interface = string(default="0.0.0.0")
@@ -46,9 +49,6 @@ item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
-
-item transcode = option("no", "unsupported", "all", default="no")
-item transcode unsupported = list(default=list("flac"))
 """ % CONFIG_VERSION
 
 

@@ -41,7 +41,8 @@ def extend_server_app(application, app):
 
         return render_template(
             "index.html", application=application,
-            provider=application.provider)
+            provider=application.provider,
+            cache_manager=application.cache_manager)
 
     @app.route("/static/<path:path>")
     @app.authenticate
@@ -67,24 +68,23 @@ def extend_server_app(application, app):
             application.stop()
 
         # Prune action
-        elif action == "prune":
-            if not application.provider.item_cache.prune_lock.locked():
-                application.provider.item_cache.expire()
-                application.provider.item_cache.prune(cleanup=True)
+        elif action == "clean":
+            cache_manager = application.cache_manager
+
+            if not cache_manager.item_cache.prune_lock.locked():
+                cache_manager.item_cache.clean(force=True)
             else:
                 logger.warn("Item cache is locked. Already pruning?")
 
-            if not application.provider.artwork_cache.prune_lock.locked():
-                application.provider.artwork_cache.expire()
-                application.provider.artwork_cache.prune(cleanup=True)
+            if not cache_manager.artwork_cache.prune_lock.locked():
+                cache_manager.artwork_cache.clean(force=True)
             else:
                 logger.warn("Artwork cache is locked. Already pruning?")
 
         # Synchronize action
         elif action == "synchronize":
             if not application.provider.lock.locked():
-                application.provider.synchronize()
-                application.provider.cache()
+                application.synchronize()
             else:
                 logger.warn("Provider is locked. Already synchronizing?")
 

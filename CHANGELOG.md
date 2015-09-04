@@ -6,6 +6,7 @@ Released XX September 2015
 Highlights:
 * Improved: better synchronization
 * Improved: live revisioning
+* Improved: transcoding settings per connection (update your config)
 * Upgraded: flask-daapserver v3.0.0
 * Upgraded: gevent v1.1
 

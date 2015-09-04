@@ -1,9 +1,9 @@
 # Paths and files are relative to the data directory!
-version = 2
+version = 3
 
-[SubSonic]
+[Connections]
 
-# You can define multiple SubSonic libraries here. Each connection will be
+# You can define multiple SubSonic connections here. Each connection will be
 # considered as a separate database. Although the DAAP protocol supports
 # multiple databases, iTunes only supports one library. The name of the key
 # defines it's name. The order is important, so don't move sections around!
@@ -26,6 +26,14 @@ password = TODO
 # Minutes between two synchronizations (default is 1440). Only valid if
 # synchronization method is set to 'interval'.
 # synchronization interval = 300
+
+# Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
+# 'all'.
+# transcode = unsupported
+
+# List of unsupported file suffixes (default is 'flac'). In case of no items or
+# just a single item, end it with a comma.
+# transcode unsupported = flac, alac, m4a
 
 
 [Daap]
@@ -89,11 +97,3 @@ item cache size = 10240
 # Percentage of cache size to clean while pruning (default is 0.25). Higher
 # values will make more space, but may remove too much
 # item cache prune threshold = 0.25
-
-# Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
-# 'all'.
-# item transcode = unsupported
-
-# List of unsupported file suffixes (default is 'flac'). In case of no items or
-# single item, end with a comma.
-# item transcode unsupported = flac, alac, m4a

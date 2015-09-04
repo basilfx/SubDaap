@@ -1,9 +1,12 @@
-from subdaap.provider import SubSonicProvider
+from subdaap.provider import Provider
+from subdaap.synchronizer import Synchronizer
 from subdaap.database import Database
 from subdaap.state import State
 from subdaap import cache, config, webserver
 
 from daapserver import DaapServer
+
+from apscheduler.schedulers.gevent import GeventScheduler
 
 import logging
 import random
@@ -27,12 +30,18 @@ class Application(object):
 
         self.server = None
         self.provider = None
-        self.bonjour = None
+
+        self.connections = {}
+        self.synchronizers = {}
 
         # Setup all parts of the application
         self.setup_config()
+        self.setup_database()
+        self.setup_state()
+        self.setup_cache()
         self.setup_provider()
         self.setup_server()
+        self.setup_tasks()
 
     def setup_config(self):
         """
@@ -41,6 +50,44 @@ class Application(object):
 
         logger.debug("Loading config from %s", self.config_file)
         self.config = config.get_config(self.config_file)
+
+    def setup_database(self):
+        """
+        Initialize database.
+        """
+
+        self.db = Database(self.config["Provider"]["database"])
+
+    def setup_state(self):
+        """
+        Setup state.
+        """
+
+        self.state = State(os.path.join(
+            self.get_cache_dir(), "provider.state"))
+
+    def setup_cache(self):
+        """
+        Setup the caches for items and artwork.
+        """
+
+        # Initialize caches for items and artwork.
+        item_cache = cache.ItemCache(
+            path=self.get_cache_dir(
+                self.config["Provider"]["item cache dir"]),
+            max_size=self.config["Provider"]["item cache size"],
+            prune_threshold=self.config[
+                "Provider"]["item cache prune threshold"])
+        artwork_cache = cache.ArtworkCache(
+            path=self.get_cache_dir(self.config[
+                "Provider"]["artwork cache dir"]),
+            max_size=self.config["Provider"]["artwork cache size"],
+            prune_threshold=self.config[
+                "Provider"]["artwork cache prune threshold"])
+
+        # Create a cache manager
+        self.cache_manager = cache.CacheManager(
+            self.db, item_cache, artwork_cache)
 
     def setup_provider(self):
         """
@@ -51,51 +98,46 @@ class Application(object):
         # after a fork, when it is opening a database.
         from subdaap import subsonic
 
-        # Initialize database
-        db = Database(self.config["Provider"]["database"])
+        # Initialize the connections.
+        for name, section in self.config["Connections"].iteritems():
+            self.connections[len(self.connections) + 1] = subsonic.Connection(
+                name=name,
+                url=section["url"],
+                username=section["username"],
+                password=section["password"],
+                transcode=section["transcode"],
+                transcode_unsupported=section["transcode unsupported"])
 
-        # Setup state
-        state = State(os.path.join(self.get_cache_dir(), "provider.state"))
-
-        # Initialize connections.
-        connections = {}
-
-        for name, section in self.config["SubSonic"].iteritems():
-            connections[len(connections) + 1] = subsonic.Connection(
-                name, section["url"], section["username"], section["password"])
-
-        # Initialize cache
-        artwork_cache_dir = self.get_cache_dir(
-            self.config["Provider"]["artwork cache dir"])
-        item_cache_dir = self.get_cache_dir(
-            self.config["Provider"]["item cache dir"])
-        artwork_cache = cache.ArtworkCache(
-            artwork_cache_dir,
-            self.config["Provider"]["artwork cache size"],
-            self.config["Provider"]["artwork cache prune threshold"])
-        item_cache = cache.ItemCache(
-            item_cache_dir,
-            self.config["Provider"]["item cache size"],
-            self.config["Provider"]["item cache prune threshold"])
-
-        # Create provider
+        # Create provider.
         logger.debug(
-            "Setting up Provider with %d connections", len(connections))
+            "Setting up provider for %d connections.", len(self.connections))
 
-        self.provider = SubSonicProvider(
-            db=db,
-            state=state,
+        self.provider = Provider(
             server_name=self.config["Provider"]["name"],
-            connections=connections,
-            artwork_cache=artwork_cache,
-            item_cache=item_cache,
-            transcode=self.config["Provider"]["item transcode"],
-            transcode_unsupported=self.config["Provider"][
-                "item transcode unsupported"])
+            db=self.db,
+            state=self.state,
+            connections=self.connections,
+            cache_manager=self.cache_manager)
+
+        # Setup synchronizers.
+        for name, section in self.config["Connections"].iteritems():
+            self.synchronizers[len(self.synchronizers) + 1] = Synchronizer(
+                state=self.state,
+                provider=self.provider,
+                db=self.db,
+                connection=self.connections[len(self.synchronizers) + 1],
+                index=len(self.synchronizers) + 1,
+                method=section["synchronization"],
+                interval=section["synchronization interval"])
+
+            # Check if an initial sync is required. This is the case for new
+            # or modified connections.
+            self.synchronizers[len(self.synchronizers)].synchronize(
+                initial=True)
 
     def setup_server(self):
         """
-        Create DAAP server.
+        Create the DAAP server.
         """
 
         logger.debug(
@@ -116,22 +158,57 @@ class Application(object):
         if self.config["Daap"]["web interface"]:
             webserver.extend_server_app(self, self.server.app)
 
+    def setup_tasks(self):
+        """
+        """
+
+        self.scheduler = GeventScheduler()
+
+        # Scheduler task to clean the cache.
+        self.scheduler.add_job(self.cache_manager.clean, "interval", minutes=1)
+
+        # Schedule tasks to synchronize each connection.
+        for index, synchronizer in self.synchronizers.iteritems():
+            self.scheduler.add_job(
+                self.synchronize, "interval", args=([index]),
+                minutes=synchronizer.interval)
+
+    def synchronize(self, indexes=None):
+        """
+        """
+
+        indexes = indexes or self.synchronizers.keys()
+
+        for index in indexes:
+            self.synchronizers[index].synchronize()
+
+        # Update the cache.
+        self.cache_manager.cache()
+
+        # Clean expired items.
+        self.cache_manager.clean()
+
     def start(self):
         """
         Start the server.
         """
 
-        self.provider.synchronize()
-        self.provider.cache()
+        logger.debug("Starting task scheduler.")
+        self.scheduler.start()
 
-        logger.info("Serving requests.")
+        logger.debug("Starting DAAP server.")
         self.server.serve_forever()
 
     def stop(self):
         """
         Stop the server.
         """
+
+        logger.debug("Stopping DAAP server.")
         self.server.stop()
+
+        logger.debug("Stopping task scheduler.")
+        self.scheduler.shutdown()
 
     def get_cache_dir(self, *path):
         """

@@ -1,4 +1,4 @@
-from subdaap.utils import human_bytes
+from subdaap.utils import human_bytes, exhaust
 from subdaap import stream
 
 from collections import OrderedDict
@@ -12,7 +12,7 @@ import os
 # Logger instance
 logger = logging.getLogger(__name__)
 
-# Time to wait for another item to finish, before failing.
+# Time in seconds to wait for another item to finish, before failing.
 TIMEOUT_WAIT_FOR_READY = 60
 
 
@@ -34,19 +34,20 @@ class FileCacheItem(object):
 
 
 class FileCache(object):
-    def __init__(self, directory, max_size, prune_threshold):
+    def __init__(self, path, max_size, prune_threshold):
         """
         Construct a new file cache.
 
-        :param str directory: Path to cache directory
+        :param str path: Path to the cache folder.
         :param int max_size: Maximum cache size (in MB), or 0 to disable.
         :param float prune_threshold: Percentage of size to prune when cache
                                       size exceeds maximum size.
         """
 
+        # This attribute is used so often, it makes the code less long.
         self.name = self.__class__.__name__
 
-        self.directory = directory
+        self.path = path
         self.max_size = max_size * 1024 * 1024
         self.prune_threshold = prune_threshold
         self.current_size = 0
@@ -59,27 +60,27 @@ class FileCache(object):
 
     def index(self, permanent_cache_keys):
         """
-        Read the cache directory and determine its size by summing the file
+        Read the cache folder and determine its size by summing the file
         size of its contents.
         """
 
         self.permanent_cache_keys = permanent_cache_keys
 
         # Walk all files and sum their size
-        for root, directories, files in os.walk(self.directory):
+        for root, directories, files in os.walk(self.path):
             if directories:
                 logger.warning(
-                    "Found unexpected directories in cache directory: %s",
-                    root)
+                    "%s: Found unexpected directories in cache path: %s",
+                    self.name, root)
 
             for cache_file in files:
                 try:
-                    cache_file = os.path.join(self.directory, cache_file)
+                    cache_file = os.path.join(self.path, cache_file)
                     cache_key = self.cache_file_to_cache_key(cache_file)
                 except ValueError:
                     logger.warning(
-                        "Found unexpected file in cache directory: %s",
-                        cache_file)
+                        "%s: Found unexpected file in cache path: %s",
+                        self.name, cache_file)
                     continue
 
                 permanent = cache_key in permanent_cache_keys
@@ -105,30 +106,27 @@ class FileCache(object):
             self.name, len(self.items), len(self.items) - count,
             human_bytes(self.current_size), human_bytes(self.max_size))
 
-        # Spawn task to prune cache and expire items.
-        def _task():
-            while True:
-                gevent.sleep(60 * 5)
-
-                self.prune()
-                self.expire()
-        gevent.spawn(_task)
-
     def cache_key_to_cache_file(self, cache_key):
         """
         Get complete path to cache file, given a cache key.
+
+        :param str cache_key:
         """
-        return os.path.join(self.directory, str(cache_key))
+        return os.path.join(self.path, str(cache_key))
 
     def cache_file_to_cache_key(self, cache_file):
         """
         Get cache key, given a cache file.
+
+        :param str cache_file:
         """
         return int(os.path.basename(cache_file))
 
     def get(self, cache_key):
         """
         Get item from the cache.
+
+        :param str cache_key:
         """
 
         # Load item from cache. If it is found in cache, move it on top of the
@@ -194,30 +192,57 @@ class FileCache(object):
         with self.items_lock:
             return cache_key in self.items
 
-    def prune(self, cleanup=False):
+    def clean(self, force=False):
         """
-        Prune items from the cache, if `self.current_sizez exceeded
+        Prune items from the cache, if `self.current_size' exceeds
         `self.max_size`. Only items that have been expired will be pruned,
         unless it is marked as permanent.
 
-        :param bool cleanup: If true, clean all items except permanent ones.
+        :param bool force: If true, clean all items except permanent ones.
         """
+
+        candidates = []
+
+        with self.items_lock:
+            for cache_key, cache_item in self.items.iteritems():
+                if cache_item.uses == 0:
+                    # Check if it is getting ready, e.g. one greenlet is
+                    # downloading the file.
+                    if cache_item.ready and not cache_item.ready.is_set():
+                        continue
+
+                    # Item was ready and not in use, therefore clear the ready
+                    # flag so no one will use it.
+                    if cache_item.ready:
+                        cache_item.ready.clear()
+
+                    candidates.append((cache_key, cache_item))
+
+        for cache_key, cache_item in candidates:
+            self.unload(cache_key, cache_item)
+
+            cache_item.iterator = None
+            cache_item.lock = None
+            cache_item.ready = None
+
+        if candidates:
+            logger.debug("%s: expired %d files", self.name, len(candidates))
 
         candidates = []
 
         with self.prune_lock, self.items_lock:
             # Check if cleanup is required.
-            if cleanup:
+            if force:
                 logger.info(
-                    "%s: cleaning all items from cache, except items that are "
-                    "in use or marked as permanent.", self.name)
+                    "%s: force cleaning all items from cache, except items "
+                    "that are in use or marked as permanent.", self.name)
             else:
                 if not self.max_size or self.current_size < self.max_size:
                     return
 
             # Determine candidates to remove.
             for cache_key, cache_item in self.items.iteritems():
-                if not cleanup:
+                if not force:
                     if self.current_size < \
                             (self.max_size * (1.0 - self.prune_threshold)):
                         break
@@ -251,38 +276,6 @@ class FileCache(object):
                 "%s: pruned %d files, current size %s/%s (%d files).",
                 self.name, len(candidates), human_bytes(self.current_size),
                 human_bytes(self.max_size), len(self.items))
-
-    def expire(self):
-        """
-        Cleanup items that are not in use anymore.
-        """
-
-        candidates = []
-
-        with self.items_lock:
-            for cache_key, cache_item in self.items.iteritems():
-                if cache_item.uses == 0:
-                    # Check if it is getting ready, e.g. one greenlet is
-                    # downloading the file.
-                    if cache_item.ready and not cache_item.ready.is_set():
-                        continue
-
-                    # Item was ready and not in use, therefore clear the ready
-                    # flag so no one will use it.
-                    if cache_item.ready:
-                        cache_item.ready.clear()
-
-                    candidates.append((cache_key, cache_item))
-
-        for cache_key, cache_item in candidates:
-            self.unload(cache_key, cache_item)
-
-            cache_item.iterator = None
-            cache_item.lock = None
-            cache_item.ready = None
-
-        if candidates:
-            logger.debug("%s: expired %d files", self.name, len(candidates))
 
     def update(self, cache_key, cache_item, cache_file, file_size):
         if cache_item.size != file_size:
@@ -353,7 +346,6 @@ class ArtworkCache(FileCache):
 
 
 class ItemCache(FileCache):
-
     def load(self, cache_key, cache_item):
         cache_file = self.cache_key_to_cache_file(cache_key)
 
@@ -391,3 +383,87 @@ class ItemCache(FileCache):
             local_fd.close()
 
             cache_item.data = None
+
+
+class CacheManager(object):
+    """
+    """
+
+    def __init__(self, db, item_cache, artwork_cache):
+        self.db = db
+        self.item_cache = item_cache
+        self.artwork_cache = artwork_cache
+
+    def get_cached_items(self):
+        """
+        Get all items that should be permanently cached, independent of which
+        database.
+        """
+
+        with self.db.get_cursor() as cursor:
+            return cursor.query_dict(
+                """
+                SELECT
+                    `items`.`id`,
+                    `items`.`database_id`,
+                    `items`.`remote_id`,
+                    `items`.`file_suffix`
+                FROM
+                    `items`
+                WHERE
+                    `items`.`cache` = 1 AND
+                    `items`.`exclude` = 0
+                """)
+
+    def cache(self):
+        """
+        Update the caches with all items that should be permanently cached.
+        """
+
+        cached_items = self.get_cached_items()
+
+        self.artwork_cache.index(cached_items)
+        self.item_cache.index(cached_items)
+
+        logger.info("Caching %d permanent items.", len(cached_items))
+
+        for local_id in cached_items:
+            logger.debug("Caching item '%d'.", local_id)
+            database_id, remote_id, file_suffix = cached_items[local_id]
+
+            # Artwork
+            if not self.artwork_cache.contains(local_id):
+                cache_item = self.artwork_cache.get(local_id)
+
+                if cache_item.ready is None:
+                    remote_fd = self.connections[database_id].getCoverArt(
+                        remote_id)
+                    self.artwork_cache.download(
+                        local_id, cache_item, remote_fd)
+
+                    # Exhaust iterator so it downloads the artwork.
+                    exhaust(cache_item.iterator())
+                self.artwork_cache.unload(local_id)
+
+            # Items
+            if not self.item_cache.contains(local_id):
+                cache_item = self.item_cache.get(local_id)
+
+                if cache_item.ready is None:
+                    remote_fd = self.get_item_fd(
+                        database_id, remote_id, file_suffix)
+                    self.item_cache.download(
+                        local_id, cache_item, remote_fd)
+
+                    # Exhaust iterator so it downloads the item.
+                    exhaust(cache_item.iterator())
+                self.item_cache.unload(local_id)
+
+        logger.info("Caching permanent items finished.")
+
+    def clean(self):
+        """
+        """
+
+        self.item_cache.clean()
+        self.artwork_cache.clean()

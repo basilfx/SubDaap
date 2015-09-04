@@ -14,16 +14,53 @@ class Synchronizer(object):
     database.
     """
 
-    def __init__(self, state, server, db, connection, index):
+    def __init__(self, state, provider, db, connection, index,
+                 method, interval):
         self.state = state
-        self.server = server
+        self.provider = provider
         self.db = db
         self.connection = connection
         self.index = index
 
-    def sync(self):
+        self.method = method
+        self.interval = interval
+
+        self.setup_state()
+
+    def setup_state(self):
         """
         """
+
+        if "synchronizers" not in self.state:
+            self.state["synchronizers"] = {}
+
+        if self.index not in self.state["synchronizers"]:
+            self.state["synchronizers"][self.index] = {
+                "connection_version": None,
+                "items_version": None,
+                "playlists_version": None
+            }
+
+    def synchronize(self, initial=False):
+        """
+        """
+
+        state = self.state["synchronizers"][self.index]
+
+        # Check connection version when initial is True. In this case, the
+        # synchronization step is skipped if the connection checksum has not
+        # changed and some usable data is in the database.
+        connection_version = utils.dict_checksum(
+            baseUrl=self.connection.baseUrl,
+            port=self.connection.port,
+            username=self.connection.username,
+            password=self.connection.password)
+
+        if initial:
+            if state["connection_version"] != connection_version:
+                logger.info("Initial synchronization is required.")
+            else:
+                return
 
         # Start session
         try:
@@ -44,22 +81,25 @@ class Synchronizer(object):
                 self.sync_base_container()
 
                 # Items
-                if self.items_version != self.state.get("items_version"):
+                if self.items_version != state.get("items_version"):
                     self.sync_items()
-                    self.state["items_version"] = self.items_version
+                    state["items_version"] = self.items_version
                 else:
                     logger.info("Items haven't been modified.")
 
                 # Containers
-                if self.containers_version != self.state.get(
-                        "containers_version"):
+                if self.containers_version != state.get("containers_version"):
                     self.sync_containers()
-                    self.state["containers_version"] = self.containers_version
+                    state["containers_version"] = self.containers_version
                 else:
                     logger.info("Containers haven't been modified.")
 
-            # Merge changes into the server
-            self.update_server()
+            # Merge changes into the server. Lock access to provider because
+            # multiple synchronizers could be active.
+            with self.provider.lock:
+                if self.update_server():
+                    self.provider.update()
+                    self.state.save()
         finally:
             # Make sure that everything is cleaned up
             self.cursor = None
@@ -84,7 +124,7 @@ class Synchronizer(object):
                     yield value["id"]
 
         # Update the server
-        server = self.server
+        server = self.provider.server
 
         # Databases
         server.databases.update_ids([self.database_id])
@@ -128,24 +168,19 @@ class Synchronizer(object):
         Because the index and playlists are reused, they are stored in cache.
         """
 
-        connection_version = 0
+        state = self.state["synchronizers"][self.index]
+
         items_version = 0
         containers_version = 0
 
-        # Connection version
-        connection_version = utils.dict_checksum(
-            baseUrl=self.connection.baseUrl, port=self.connection.port,
-            username=self.connection.username,
-            password=self.connection.password)
-
         # Items version (last modified property)
         self.cache["index"] = response = self.connection.getIndexes(
-            ifModifiedSince=self.state["items_version"])
+            ifModifiedSince=state["items_version"])
 
         if "lastModified" in response["indexes"]:
             items_version = response["indexes"]["lastModified"]
         else:
-            items_version = self.state["items_version"]
+            items_version = state["items_version"]
 
         # Playlists
         self.cache["playlists"] = response = self.connection.getPlaylists()
@@ -159,7 +194,6 @@ class Synchronizer(object):
                 % 0xFFFFFFFF
 
         # Return version numbers
-        self.connection_version = connection_version
         self.items_version = items_version
         self.containers_version = containers_version
 

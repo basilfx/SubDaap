@@ -8,18 +8,28 @@ class Connection(libsonic.Connection):
     """
     Extend `libsonic.Connection` with new features and fix a few issues.
 
-    - Add library name property.
     - Parse URL for host and port for constructor.
     - Make sure API results are of of uniform type.
+    - Add transcoding options for internal use
 
-    :param str name: Name of connection.
-    :param str url: Full URL (including protocol) of SubSonic server.
-    :param str username: Username of server.
-    :param str password: Password of server.
+    :param str name: Identifiable name that represents this connection.
+    :param str url: Full URL (including scheme) of the SubSonic server.
+    :param str username: Username of the server.
+    :param str password: Password of the server.
+    :param str transcode: Either 'all', 'unsupported' or 'no'.
+    :param list transcode_unsupported: List of file extensions that are not
+                                       supported, thus will be transcoded.
     """
 
-    def __init__(self, name, url, username, password):
+    def __init__(self, name, url, username, password, transcode,
+                 transcode_unsupported):
+        """
+        """
+
+        # Save some connection related settings.
         self.name = name
+        self.transcode = transcode
+        self.transcode_unsupported = transcode_unsupported
 
         # Parse SubSonic URL
         parts = urlparse.urlparse(url)

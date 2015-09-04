@@ -19,27 +19,6 @@ class Server(models.Server):
         # Required for database -> object conversion
         self.databases.child_class = Database
 
-    def get_cached_items(self):
-        """
-        Get all items that should be permanently cached, independent of which
-        database.
-        """
-
-        with self.db.get_cursor() as cursor:
-            return cursor.query_dict(
-                """
-                SELECT
-                    `items`.`id`,
-                    `items`.`database_id`,
-                    `items`.`remote_id`,
-                    `items`.`file_suffix`
-                FROM
-                    `items`
-                WHERE
-                    `items`.`cache` = 1 AND
-                    `items`.`exclude` = 0
-                """)
-
 
 class Database(models.Database):
     """
