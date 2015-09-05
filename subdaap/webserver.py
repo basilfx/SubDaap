@@ -67,26 +67,17 @@ def extend_server_app(application, app):
         if action == "shutdown":
             application.stop()
 
-        # Prune action
+        # Expire action
+        elif action == "expire":
+            application.cache_manager.expire()
+
+        # Clean action
         elif action == "clean":
-            cache_manager = application.cache_manager
-
-            if not cache_manager.item_cache.prune_lock.locked():
-                cache_manager.item_cache.clean(force=True)
-            else:
-                logger.warn("Item cache is locked. Already pruning?")
-
-            if not cache_manager.artwork_cache.prune_lock.locked():
-                cache_manager.artwork_cache.clean(force=True)
-            else:
-                logger.warn("Artwork cache is locked. Already pruning?")
+            application.cache_manager.clean(force=True)
 
         # Synchronize action
         elif action == "synchronize":
-            if not application.provider.lock.locked():
-                application.synchronize()
-            else:
-                logger.warn("Provider is locked. Already synchronizing?")
+            application.synchronize()
 
         # Return back to index
         return redirect(url_for("index"))

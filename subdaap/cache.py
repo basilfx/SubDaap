@@ -192,13 +192,9 @@ class FileCache(object):
         with self.items_lock:
             return cache_key in self.items
 
-    def clean(self, force=False):
+    def expire(self):
         """
-        Prune items from the cache, if `self.current_size' exceeds
-        `self.max_size`. Only items that have been expired will be pruned,
-        unless it is marked as permanent.
-
-        :param bool force: If true, clean all items except permanent ones.
+        Cleanup items (file descriptors etc.) that are not in use anymore.
         """
 
         candidates = []
@@ -227,6 +223,16 @@ class FileCache(object):
 
         if candidates:
             logger.debug("%s: expired %d files", self.name, len(candidates))
+
+    def clean(self, force=False):
+        """
+        Prune items from the cache, if `self.current_size' exceeds
+        `self.max_size`. Only items that have been expired will be pruned,
+        unless it is marked as permanent.
+
+        :param bool force: If true, clean all items except permanent ones. This
+                           effectively removes all items from cache.
+        """
 
         candidates = []
 
@@ -472,9 +478,16 @@ class CacheManager(object):
 
         logger.info("Caching permanent items finished.")
 
-    def clean(self):
+    def expire(self):
         """
         """
 
-        self.item_cache.clean()
-        self.artwork_cache.clean()
+        self.item_cache.expire()
+        self.artwork_cache.expire()
+
+    def clean(self, force=False):
+        """
+        """
+
+        self.item_cache.clean(force)
+        self.artwork_cache.clean(force)

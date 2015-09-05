@@ -160,18 +160,22 @@ class Application(object):
 
     def setup_tasks(self):
         """
+        Setup all tasks that run periodically.
         """
 
         self.scheduler = GeventScheduler()
 
-        # Scheduler task to clean the cache.
-        self.scheduler.add_job(self.cache_manager.clean, "interval", minutes=1)
+        # Scheduler task to clean and expire the cache.
+        self.scheduler.add_job(
+            self.cache_manager.expire, trigger="interval", minutes=5)
+        self.scheduler.add_job(
+            self.cache_manager.clean, trigger="interval", minutes=30)
 
         # Schedule tasks to synchronize each connection.
         for index, synchronizer in self.synchronizers.iteritems():
             self.scheduler.add_job(
-                self.synchronize, "interval", args=([index]),
-                minutes=synchronizer.interval)
+                self.synchronize, args=([index]),
+                trigger="interval", minutes=synchronizer.interval)
 
     def synchronize(self, indexes=None):
         """
