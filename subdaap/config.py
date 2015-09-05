@@ -1,7 +1,7 @@
 from cStringIO import StringIO
 
 from configobj import ConfigObj, flatten_errors
-from validate import Validator
+from validate import Validator, is_string_list
 
 import logging
 
@@ -24,7 +24,7 @@ synchronization = option("manual", "startup", "interval", default="interval")
 synchronization interval = integer(min=1, default=1440)
 
 transcode = option("no", "unsupported", "all", default="no")
-transcode unsupported = list(default=list("flac"))
+transcode unsupported = lowercase_string_list(default=list("flac"))
 
 [Daap]
 interface = string(default="0.0.0.0")
@@ -52,6 +52,15 @@ item cache prune threshold = float(min=0, max=1.0, default=0.25)
 """ % CONFIG_VERSION
 
 
+def lowercase_string_list(value, min=None, max=None):
+    """
+    Custom ConfigObj validator that returns a list of lowercase
+    items.
+    """
+    validated_string_list = is_string_list(value, min, max)
+    return [x.lower() for x in validated_string_list]
+
+
 def get_config(config_file):
     """
     Parse the config file, validate it and convert types. Return a dictionary
@@ -62,7 +71,7 @@ def get_config(config_file):
     config = ConfigObj(config_file, configspec=specs)
 
     # Create validator
-    validator = Validator()
+    validator = Validator({'lowercase_string_list': lowercase_string_list})
 
     # Convert types and validate file
     result = config.validate(validator, preserve_errors=True, copy=True)
@@ -78,10 +87,6 @@ def get_config(config_file):
             raise ValueError(
                 "The following section was missing: %s." % (
                     ", ".join(section_list)))
-
-    # Post-process values
-    config["Provider"]["item transcode unsupported"] = [
-        x.lower() for x in config["Provider"]["item transcode unsupported"]]
 
     # For now, no automatic update support.
     if config["version"] != CONFIG_VERSION:
