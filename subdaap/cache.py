@@ -437,37 +437,38 @@ class CacheManager(object):
 
         logger.info("Caching %d permanent items.", len(cached_items))
 
-        for local_id in cached_items:
-            logger.debug("Caching item '%d'.", local_id)
-            database_id, remote_id, file_suffix = cached_items[local_id]
+        for item_id in cached_items:
+            logger.debug("Caching item '%d'.", item_id)
+
+            database_id = cached_items[item_id]["database_id"]
+            remote_id = cached_items[item_id]["remote_id"]
+            file_suffix = cached_items[item_id]["file_suffix"]
 
             # Artwork
-            if not self.artwork_cache.contains(local_id):
-                cache_item = self.artwork_cache.get(local_id)
+            if not self.artwork_cache.contains(item_id):
+                cache_item = self.artwork_cache.get(item_id)
 
                 if cache_item.ready is None:
                     remote_fd = self.connections[database_id].getCoverArt(
                         remote_id)
-                    self.artwork_cache.download(
-                        local_id, cache_item, remote_fd)
+                    self.artwork_cache.download(item_id, cache_item, remote_fd)
 
                     # Exhaust iterator so it downloads the artwork.
                     exhaust(cache_item.iterator())
-                self.artwork_cache.unload(local_id)
+                self.artwork_cache.unload(item_id, cache_item)
 
             # Items
-            if not self.item_cache.contains(local_id):
-                cache_item = self.item_cache.get(local_id)
+            if not self.item_cache.contains(item_id):
+                cache_item = self.item_cache.get(item_id)
 
                 if cache_item.ready is None:
                     remote_fd = self.get_item_fd(
                         database_id, remote_id, file_suffix)
-                    self.item_cache.download(
-                        local_id, cache_item, remote_fd)
+                    self.item_cache.download(item_id, cache_item, remote_fd)
 
                     # Exhaust iterator so it downloads the item.
                     exhaust(cache_item.iterator())
-                self.item_cache.unload(local_id)
+                self.item_cache.unload(item_id, cache_item)
 
         logger.info("Caching permanent items finished.")
 
