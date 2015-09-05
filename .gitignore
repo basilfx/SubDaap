@@ -1,4 +1,6 @@
 # Project files
+build/
+dist/
 data/
 *.ini
 *.db
