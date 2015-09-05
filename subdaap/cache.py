@@ -410,9 +410,19 @@ class CacheManager(object):
                     `items`.`file_suffix`
                 FROM
                     `items`
+                LEFT OUTER JOIN
+                    `artists` ON `items`.`artist_id`=`artists`.`id`
+                LEFT OUTER JOIN
+                    `albums` ON `items`.`album_id`=`albums`.`id`
                 WHERE
-                    `items`.`cache` = 1 AND
-                    `items`.`exclude` = 0
+                    (
+                        `items`.`cache` = 1 OR
+                        COALESCE(`artists`.`cache`, 0) = 1 OR
+                        COALESCE(`albums`.`cache`, 0) = 1
+                    ) AND
+                    `items`.`exclude` = 0 AND
+                    COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`albums`.`exclude`, 0) = 0
                 """)
 
     def cache(self):
