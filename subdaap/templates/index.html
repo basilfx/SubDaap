@@ -68,6 +68,49 @@
             <a class="pure-button button-warning text-small" href="/actions/expire">Expire cache</a>
             <a class="pure-button button-success text-small" href="/actions/synchronize">Synchronize</a>
 
+            <h2>Connections</h2>
+
+            <p>
+                List of configured connections.
+            </p>
+
+            <table class="pure-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Synchronization</th>
+                        <th>Transcode</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for connection in application.connections.itervalues() %}
+                        <tr>
+                            <td>
+                                {{ connection.index }}
+                            </td>
+                            <td>
+                                {{ connection.name }}
+                            </td>
+                            <td>
+                                {{ connection.url }}
+                            </td>
+                            <td>
+                                {{ connection.synchronization }}
+                            </td>
+                            <td>
+                                {{ connection.transcode }}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5">No connections configured.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
             <h2>Server databases</h2>
 
             <p>
@@ -152,7 +195,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="8">No clients connected</td>
+                            <td colspan="8">No clients connected.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -199,7 +242,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="5">No cached items in use</td>
+                            <td colspan="5">No cached items in use.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
