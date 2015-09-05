@@ -112,6 +112,8 @@ class Synchronizer(object):
         """
         """
 
+        changed = False
+
         # Helper methods
         def updated_ids(items):
             for value in items.itervalues():
@@ -123,38 +125,64 @@ class Synchronizer(object):
                 if "updated" not in value:
                     yield value["id"]
 
+        def has_updated_ids(items):
+            for _ in updated_ids(items):
+                return True
+            return False
+
+        def has_removed_ids(items):
+            for _ in updated_ids(items):
+                return True
+            return False
+
+        def should_update(items):
+            return has_updated_ids(items) or has_removed_ids(items)
+
         # Update the server
         server = self.provider.server
 
-        # Databases
-        server.databases.update_ids([self.database_id])
-
         # Items
-        database = server.databases[self.database_id]
-        database.items.remove_ids(removed_ids(self.items_by_remote_id))
-        database.items.update_ids(updated_ids(self.items_by_remote_id))
+        if should_update(self.items_by_remote_id):
+            database = server.databases[self.database_id]
+            database.items.remove_ids(removed_ids(self.items_by_remote_id))
+            database.items.update_ids(updated_ids(self.items_by_remote_id))
+
+            changed = True
 
         # Base container and container items
-        database.containers.update_ids([self.base_container_id])
-        base_container = database.containers[self.base_container_id]
-        base_container.container_items.remove_ids(
-            removed_ids(self.base_container_items_by_item_id))
-        base_container.container_items.update_ids(
-            updated_ids(self.base_container_items_by_item_id))
+        if should_update(self.base_container_items_by_item_id):
+            database.containers.update_ids([self.base_container_id])
+            base_container = database.containers[self.base_container_id]
+            base_container.container_items.remove_ids(
+                removed_ids(self.base_container_items_by_item_id))
+            base_container.container_items.update_ids(
+                updated_ids(self.base_container_items_by_item_id))
+
+            changed = True
 
         # Other containers and container items
-        database.containers.remove_ids(
-            removed_ids(self.containers_by_remote_id))
-        database.containers.update_ids(
-            updated_ids(self.containers_by_remote_id))
+        if should_update(self.containers_by_remote_id):
+            database.containers.remove_ids(
+                removed_ids(self.containers_by_remote_id))
+            database.containers.update_ids(
+                updated_ids(self.containers_by_remote_id))
 
-        for container in self.containers_by_remote_id.itervalues():
-            if "updated" not in container:
-                updated_ids = container["container_items"]
-                container = database.containers[container["id"]]
+            for container in self.containers_by_remote_id.itervalues():
+                if "updated" not in container:
+                    updated_ids = container["container_items"]
+                    container = database.containers[container["id"]]
 
-                container.container_items.remove_ids(container.container_items)
-                container.container_items.update_ids(updated_ids)
+                    container.container_items.remove_ids(
+                        container.container_items)
+                    container.container_items.update_ids(updated_ids)
+
+            changed = True
+
+        # Only update database if any of the above parts have changed.
+        if changed:
+            server.databases.update_ids([self.database_id])
+
+        return changed
 
     def sync_versions(self):
         """
