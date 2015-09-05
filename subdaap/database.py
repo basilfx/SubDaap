@@ -73,10 +73,12 @@ class Database(object):
             # Add extra SQL to drop all tables if desired
             if drop_all:
                 extra = """
-                    DROP TABLE IF EXISTS `databases`;
-                    DROP TABLE IF EXISTS `items`;
-                    DROP TABLE IF EXISTS `containers`;
                     DROP TABLE IF EXISTS `container_items`;
+                    DROP TABLE IF EXISTS `containers`;
+                    DROP TABLE IF EXISTS `items`;
+                    DROP TABLE IF EXISTS `artists`;
+                    DROP TABLE IF EXISTS `albums`;
+                    DROP TABLE IF EXISTS `databases`;
                     """
             else:
                 extra = ""
