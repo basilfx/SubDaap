@@ -148,6 +148,7 @@ class Database(object):
                         `id` INTEGER PRIMARY KEY,
                         `persistent_id` INTEGER DEFAULT 0,
                         `database_id` int(11) NOT NULL,
+                        `container_id` int(11) NOT NULL,
                         `item_id` int(11) NOT NULL,
                         `order` int(11) DEFAULT NULL,
                         CONSTRAINT `container_item_fk_1` FOREIGN KEY (`database_id`) REFERENCES `databases` (`id`)

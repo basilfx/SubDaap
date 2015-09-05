@@ -179,7 +179,7 @@ class FileCache(object):
         with cache_item.lock:
             if cache_item.iterator is None:
                 cache_item.ready.clear()
-                self.load(cache_key)
+                self.load(cache_key, cache_item)
 
         return cache_item
 

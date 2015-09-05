@@ -32,10 +32,10 @@ class State(object):
         Save state to file.
         """
 
-        logger.debug("Saving application state to '%s'.", self.state_file)
+        logger.debug("Saving application state to '%s'.", self.file_name)
 
         with self.lock:
-            with open(self.state_file, "wb") as fp:
+            with open(self.file_name, "wb") as fp:
                 cPickle.dump(self.state, fp)
 
     def load(self):
