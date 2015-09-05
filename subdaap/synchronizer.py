@@ -14,16 +14,16 @@ class Synchronizer(object):
     database.
     """
 
-    def __init__(self, state, provider, db, connection, index,
-                 method, interval):
-        self.state = state
-        self.provider = provider
-        self.db = db
-        self.connection = connection
-        self.index = index
+    def __init__(self, db, state, index, name, subsonic):
+        """
+        """
 
-        self.method = method
-        self.interval = interval
+        self.db = db
+        self.state = state
+
+        self.name = name
+        self.subsonic = subsonic
+        self.index = index
 
         self.setup_state()
 
@@ -55,10 +55,10 @@ class Synchronizer(object):
         # synchronization step is skipped if the connection checksum has not
         # changed and some usable data is in the database.
         connection_version = utils.dict_checksum(
-            baseUrl=self.connection.baseUrl,
-            port=self.connection.port,
-            username=self.connection.username,
-            password=self.connection.password)
+            baseUrl=self.subsonic.baseUrl,
+            port=self.subsonic.port,
+            username=self.subsonic.username,
+            password=self.subsonic.password)
 
         if initial:
             if state["connection_version"] != connection_version:
@@ -218,7 +218,7 @@ class Synchronizer(object):
         containers_version = 0
 
         # Items version (last modified property)
-        response = self.connection.getIndexes(
+        response = self.subsonic.getIndexes(
             ifModifiedSince=state["items_version"])
 
         if "lastModified" in response["indexes"]:
@@ -227,10 +227,10 @@ class Synchronizer(object):
             items_version = state["items_version"]
 
         # Playlists
-        response = self.connection.getPlaylists()
+        response = self.subsonic.getPlaylists()
 
         for playlist in response["playlists"]["playlist"]:
-            response = self.connection.getPlaylist(playlist["id"])
+            response = self.subsonic.getPlaylist(playlist["id"])
 
             containers_checksum = utils.dict_checksum(response["playlist"])
             containers_version = (containers_version + containers_checksum) \
@@ -246,7 +246,7 @@ class Synchronizer(object):
 
         # Calculate checksum
         checksum = utils.dict_checksum(
-            name=self.connection.name, remote_id=self.index)
+            name=self.name, remote_id=self.index)
 
         # Fetch existing item
         try:
@@ -276,7 +276,7 @@ class Synchronizer(object):
                     (?, ?, ?, ?)
                 """,
                 generate_persistent_id(),
-                self.connection.name,
+                self.name,
                 checksum,
                 self.index).lastrowid
         elif row["checksum"] != checksum:
@@ -291,7 +291,7 @@ class Synchronizer(object):
                 WHERE
                     `databases`.`id` = ?
                 """,
-                self.connection.name,
+                self.name,
                 checksum,
                 database_id)
         else:
@@ -306,7 +306,7 @@ class Synchronizer(object):
 
         # Calculate checksum
         checksum = utils.dict_checksum(
-            is_base=True, is_smart=False, name=self.connection.name)
+            is_base=True, is_smart=False, name=self.name)
 
         # Fetch existing item
         try:
@@ -340,7 +340,7 @@ class Synchronizer(object):
                 """,
                 generate_persistent_id(),
                 self.database_id,
-                self.connection.name,
+                self.name,
                 True,
                 False,
                 checksum).lastrowid
@@ -358,7 +358,7 @@ class Synchronizer(object):
                 WHERE
                     `containers`.`id` = ?
                 """,
-                self.connection.name,
+                self.name,
                 True,
                 False,
                 checksum,
@@ -433,12 +433,12 @@ class Synchronizer(object):
             """, self.base_container_id)
 
         # Iterate over each item, sync artist, album, item and container item.
-        for item in self.connection.walk_index():
+        for item in self.subsonic.walk_index():
             if "artistId" in item:
                 if not is_artist_processed(item):
                     self.sync_artist(item)
 
-                    for album in self.connection.walk_artist(item["artistId"]):
+                    for album in self.subsonic.walk_artist(item["artistId"]):
                         if not is_album_processed(album):
                             self.sync_album(album)
 
@@ -761,7 +761,7 @@ class Synchronizer(object):
             """, self.database_id, self.base_container_id)
 
         # Iterate over each playlist.
-        for container in self.connection.walk_playlists():
+        for container in self.subsonic.walk_playlists():
             self.sync_container(container)
             self.sync_container_items(container)
 
@@ -859,7 +859,7 @@ class Synchronizer(object):
                 `container_items`.`container_id` = ?
             """, self.containers_by_remote_id[container["id"]]["id"])
 
-        for container_item in self.connection.walk_playlist(container["id"]):
+        for container_item in self.subsonic.walk_playlist(container["id"]):
             self.sync_container_item(container, container_item)
 
     def sync_container_item(self, container, container_item):

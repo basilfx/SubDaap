@@ -1,6 +1,6 @@
 from subdaap.provider import Provider
-from subdaap.synchronizer import Synchronizer
 from subdaap.database import Database
+from subdaap.connection import Connection
 from subdaap.state import State
 from subdaap import cache, config, webserver
 
@@ -30,15 +30,14 @@ class Application(object):
 
         self.server = None
         self.provider = None
-
         self.connections = {}
-        self.synchronizers = {}
 
         # Setup all parts of the application
         self.setup_config()
         self.setup_database()
         self.setup_state()
         self.setup_cache()
+        self.setup_connections()
         self.setup_provider()
         self.setup_server()
         self.setup_tasks()
@@ -89,28 +88,35 @@ class Application(object):
         self.cache_manager = cache.CacheManager(
             self.db, item_cache, artwork_cache)
 
-    def setup_provider(self):
+    def setup_connections(self):
         """
-        Setup the database connection, the SubSonic connection and provider.
+        Initialize the connections.
         """
 
-        # Subsonic is imported here, because it somehow causes Python to crash
-        # after a fork, when it is opening a database.
-        from subdaap import subsonic
-
-        # Initialize the connections.
         for name, section in self.config["Connections"].iteritems():
-            self.connections[len(self.connections) + 1] = subsonic.Connection(
+            index = len(self.connections) + 1
+
+            self.connections[index] = Connection(
+                db=self.db,
+                state=self.state,
+                index=index,
                 name=name,
                 url=section["url"],
                 username=section["username"],
                 password=section["password"],
+                synchronization=section["synchronization"],
+                synchronization_interval=section["synchronization interval"],
                 transcode=section["transcode"],
                 transcode_unsupported=section["transcode unsupported"])
 
+    def setup_provider(self):
+        """
+        Setup the provider.
+        """
+
         # Create provider.
         logger.debug(
-            "Setting up provider for %d connections.", len(self.connections))
+            "Setting up provider for %d connection(s).", len(self.connections))
 
         self.provider = Provider(
             server_name=self.config["Provider"]["name"],
@@ -119,21 +125,10 @@ class Application(object):
             connections=self.connections,
             cache_manager=self.cache_manager)
 
-        # Setup synchronizers.
-        for name, section in self.config["Connections"].iteritems():
-            self.synchronizers[len(self.synchronizers) + 1] = Synchronizer(
-                state=self.state,
-                provider=self.provider,
-                db=self.db,
-                connection=self.connections[len(self.synchronizers) + 1],
-                index=len(self.synchronizers) + 1,
-                method=section["synchronization"],
-                interval=section["synchronization interval"])
-
-            # Check if an initial sync is required. This is the case for new
-            # or modified connections.
-            self.synchronizers[len(self.synchronizers)].synchronize(
-                initial=True)
+        # Do an initial synchronization if required.
+        for connection in self.connections.itervalues():
+            connection.synchronizer.provider = self.provider
+            connection.synchronizer.synchronize(initial=True)
 
     def setup_server(self):
         """
@@ -172,19 +167,20 @@ class Application(object):
             self.cache_manager.clean, trigger="interval", minutes=30)
 
         # Schedule tasks to synchronize each connection.
-        for index, synchronizer in self.synchronizers.iteritems():
+        for connection in self.connections.itervalues():
             self.scheduler.add_job(
-                self.synchronize, args=([index]),
-                trigger="interval", minutes=synchronizer.interval)
+                self.synchronize, args=([connection]),
+                trigger="interval",
+                minutes=connection.synchronization_interval)
 
-    def synchronize(self, indexes=None):
+    def synchronize(self, connections=None):
         """
         """
 
-        indexes = indexes or self.synchronizers.keys()
+        connections = connections or self.connections.values()
 
-        for index in indexes:
-            self.synchronizers[index].synchronize()
+        for connection in connections:
+            connection.synchronizer.synchronize()
 
         # Update the cache.
         self.cache_manager.cache()

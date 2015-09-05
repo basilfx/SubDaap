@@ -4,7 +4,7 @@ import urlparse
 import libsonic
 
 
-class Connection(libsonic.Connection):
+class SubsonicClient(libsonic.Connection):
     """
     Extend `libsonic.Connection` with new features and fix a few issues.
 
@@ -12,24 +12,14 @@ class Connection(libsonic.Connection):
     - Make sure API results are of of uniform type.
     - Add transcoding options for internal use
 
-    :param str name: Identifiable name that represents this connection.
     :param str url: Full URL (including scheme) of the SubSonic server.
     :param str username: Username of the server.
     :param str password: Password of the server.
-    :param str transcode: Either 'all', 'unsupported' or 'no'.
-    :param list transcode_unsupported: List of file extensions that are not
-                                       supported, thus will be transcoded.
     """
 
-    def __init__(self, name, url, username, password, transcode,
-                 transcode_unsupported):
+    def __init__(self, url, username, password):
         """
         """
-
-        # Save some connection related settings.
-        self.name = name
-        self.transcode = transcode
-        self.transcode_unsupported = transcode_unsupported
 
         # Parse SubSonic URL
         parts = urlparse.urlparse(url)
@@ -49,7 +39,8 @@ class Connection(libsonic.Connection):
         port = parts.port or {"http": 80, "https": 443}[scheme]
 
         # Invoke original constructor
-        super(Connection, self).__init__(host, username, password, port=port)
+        super(SubsonicClient, self).__init__(
+            host, username, password, port=port)
 
     def getIndexes(self, *args, **kwargs):
         """
@@ -80,7 +71,7 @@ class Connection(libsonic.Connection):
 
                 yield child
 
-        response = super(Connection, self).getIndexes(*args, **kwargs)
+        response = super(SubsonicClient, self).getIndexes(*args, **kwargs)
         response["indexes"] = response.get("indexes", {})
         response["indexes"]["index"] = list(
             _index_iterator(response["indexes"].get("index")))
@@ -98,7 +89,7 @@ class Connection(libsonic.Connection):
                 playlist["id"] = int(playlist["id"])
                 yield playlist
 
-        response = super(Connection, self).getPlaylists(*args, **kwargs)
+        response = super(SubsonicClient, self).getPlaylists(*args, **kwargs)
         response["playlists"]["playlist"] = list(
             _playlists_iterator(response["playlists"].get("playlist")))
 
@@ -113,7 +104,7 @@ class Connection(libsonic.Connection):
                 entry["id"] = int(entry["id"])
                 yield entry
 
-        response = super(Connection, self).getPlaylist(*args, **kwargs)
+        response = super(SubsonicClient, self).getPlaylist(*args, **kwargs)
         response["playlist"]["entry"] = list(
             _entries_iterator(response["playlist"].get("entry")))
 
@@ -132,7 +123,7 @@ class Connection(libsonic.Connection):
 
                 yield album
 
-        response = super(Connection, self).getArtist(*args, **kwargs)
+        response = super(SubsonicClient, self).getArtist(*args, **kwargs)
         response["artist"]["album"] = list(
             _albums_iterator(response["artist"].get("album")))
 
@@ -157,7 +148,8 @@ class Connection(libsonic.Connection):
 
                 yield child
 
-        response = super(Connection, self).getMusicDirectory(*args, **kwargs)
+        response = super(SubsonicClient, self).getMusicDirectory(
+            *args, **kwargs)
         response["directory"]["child"] = list(
             _children_iterator(response["directory"].get("child")))
 

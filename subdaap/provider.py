@@ -54,11 +54,11 @@ class Provider(provider.Provider):
         """
         """
 
+        connection = self.connections[item.database_id]
         cache_item = self.artwork_cache.get(item.id)
 
         if cache_item.iterator is None:
-            remote_fd = self.connections[item.database_id].getCoverArt(
-                item.remote_id)
+            remote_fd = connection.subsonic.getCoverArt(item.remote_id)
             self.artwork_cache.download(item.id, cache_item, remote_fd)
 
             return cache_item.iterator(), None, None
@@ -87,15 +87,12 @@ class Provider(provider.Provider):
         """
 
         connection = self.connections[database_id]
-        needs_transcoding = connection.transcode == "all" or (
-            connection.transcode == "unsupported" and
-            file_suffix in connection.transcode_unsupported)
 
-        if needs_transcoding:
+        if connection.needs_transcoding(file_suffix):
             logger.debug(
                 "Transcoding item '%d' with file suffix '%s'.",
                 remote_id, file_suffix)
-            return connection.stream(
+            return connection.subsonic.stream(
                 remote_id, tformat="mp3")
         else:
-            return connection.download(remote_id)
+            return connection.subsonic.download(remote_id)
