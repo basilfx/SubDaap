@@ -162,3 +162,67 @@ class Connection(libsonic.Connection):
             _children_iterator(response["directory"].get("child")))
 
         return response
+
+    def walk_index(self):
+        """
+        Request SubSonic's index and iterate each item.
+        """
+
+        response = self.getIndexes()
+
+        for index in response["indexes"]["index"]:
+            for index in index["artist"]:
+                for item in self.walk_directory(index["id"]):
+                    yield item
+
+        for child in response["indexes"]["child"]:
+            if child.get("isDir"):
+                for child in self.walk_directory(child["id"]):
+                    yield child
+            else:
+                yield child
+
+    def walk_playlists(self):
+        """
+        Request SubSonic's playlists and iterate over each item.
+        """
+
+        response = self.getPlaylists()
+
+        for child in response["playlists"]["playlist"]:
+            yield child
+
+    def walk_playlist(self, playlist_id):
+        """
+        Request SubSonic's playlist items and iterate over each item.
+        """
+
+        response = self.getPlaylist(playlist_id)
+
+        for order, child in enumerate(response["playlist"]["entry"], start=1):
+            child["order"] = order
+            yield child
+
+    def walk_directory(self, directory_id):
+        """
+        Request a SubSonic music directory and iterate over each item.
+        """
+
+        response = self.getMusicDirectory(directory_id)
+
+        for child in response["directory"]["child"]:
+            if child.get("isDir"):
+                for child in self.walk_directory(child["id"]):
+                    yield child
+            else:
+                yield child
+
+    def walk_artist(self, artist_id):
+        """
+        Request a SubSonic artist and iterate over each album.
+        """
+
+        response = self.getArtist(artist_id)
+
+        for child in response["artist"]["album"]:
+            yield child

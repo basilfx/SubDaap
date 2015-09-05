@@ -29,6 +29,7 @@ class Synchronizer(object):
 
     def setup_state(self):
         """
+        Ensure a state is available for this instance.
         """
 
         if "synchronizers" not in self.state:
@@ -38,12 +39,15 @@ class Synchronizer(object):
             self.state["synchronizers"][self.index] = {
                 "connection_version": None,
                 "items_version": None,
-                "playlists_version": None
+                "containers_version": None
             }
 
     def synchronize(self, initial=False):
         """
         """
+
+        error = True
+        changed = False
 
         state = self.state["synchronizers"][self.index]
 
@@ -59,17 +63,19 @@ class Synchronizer(object):
         if initial:
             if state["connection_version"] != connection_version:
                 logger.info("Initial synchronization is required.")
+                changed = True
             else:
                 return
 
         # Start session
         try:
             with self.db.get_write_cursor() as cursor:
-                self.cursor = cursor
-                self.cache = {}
-
                 # Prepare variables
+                self.cursor = cursor
+
                 self.items_by_remote_id = {}
+                self.artists_by_remote_id = {}
+                self.albums_by_remote_id = {}
                 self.base_container_items_by_item_id = {}
                 self.containers_by_remote_id = {}
 
@@ -83,30 +89,40 @@ class Synchronizer(object):
                 # Items
                 if self.items_version != state.get("items_version"):
                     self.sync_items()
-                    state["items_version"] = self.items_version
                 else:
                     logger.info("Items haven't been modified.")
 
                 # Containers
                 if self.containers_version != state.get("containers_version"):
                     self.sync_containers()
-                    state["containers_version"] = self.containers_version
                 else:
                     logger.info("Containers haven't been modified.")
 
             # Merge changes into the server. Lock access to provider because
             # multiple synchronizers could be active.
-            with self.provider.lock:
-                if self.update_server():
-                    self.provider.update()
-                    self.state.save()
+            if self.update_server():
+                self.provider.update()
+
+                changed = True
+                error = False
         finally:
             # Make sure that everything is cleaned up
             self.cursor = None
-            self.cache = None
 
-        # TODO: make dependent on actual changes
-        return True
+            self.items_by_remote_id = {}
+            self.artists_by_remote_id = {}
+            self.albums_by_remote_id = {}
+            self.base_container_items_by_item_id = {}
+            self.containers_by_remote_id = {}
+
+        # Update state if some things have changed.
+        if changed:
+            if not error:
+                state["connection_version"] = connection_version
+                state["items_version"] = self.items_version
+                state["containers_version"] = self.containers_version
+
+            self.state.save()
 
     def update_server(self):
         """
@@ -202,7 +218,7 @@ class Synchronizer(object):
         containers_version = 0
 
         # Items version (last modified property)
-        self.cache["index"] = response = self.connection.getIndexes(
+        response = self.connection.getIndexes(
             ifModifiedSince=state["items_version"])
 
         if "lastModified" in response["indexes"]:
@@ -211,11 +227,10 @@ class Synchronizer(object):
             items_version = state["items_version"]
 
         # Playlists
-        self.cache["playlists"] = response = self.connection.getPlaylists()
+        response = self.connection.getPlaylists()
 
         for playlist in response["playlists"]["playlist"]:
-            self.cache["playlist_%d" % playlist["id"]] = response = \
-                self.connection.getPlaylist(playlist["id"])
+            response = self.connection.getPlaylist(playlist["id"])
 
             containers_checksum = utils.dict_checksum(response["playlist"])
             containers_version = (containers_version + containers_checksum) \
@@ -418,12 +433,12 @@ class Synchronizer(object):
             """, self.base_container_id)
 
         # Iterate over each item, sync artist, album, item and container item.
-        for item in self.walk_index():
+        for item in self.connection.walk_index():
             if "artistId" in item:
                 if not is_artist_processed(item):
                     self.sync_artist(item)
 
-                    for album in self.walk_artist(item["artistId"]):
+                    for album in self.connection.walk_artist(item["artistId"]):
                         if not is_album_processed(album):
                             self.sync_album(album)
 
@@ -746,7 +761,7 @@ class Synchronizer(object):
             """, self.database_id, self.base_container_id)
 
         # Iterate over each playlist.
-        for container in self.walk_playlists():
+        for container in self.connection.walk_playlists():
             self.sync_container(container)
             self.sync_container_items(container)
 
@@ -844,7 +859,7 @@ class Synchronizer(object):
                 `container_items`.`container_id` = ?
             """, self.containers_by_remote_id[container["id"]]["id"])
 
-        for container_item in self.walk_playlist(container["id"]):
+        for container_item in self.connection.walk_playlist(container["id"]):
             self.sync_container_item(container, container_item)
 
     def sync_container_item(self, container, container_item):
@@ -872,69 +887,3 @@ class Synchronizer(object):
         # Update cache
         self.containers_by_remote_id[container["id"]][
             "container_items"].append(container_item_id)
-
-    def walk_index(self):
-        """
-        Request SubSonic's index and iterate each item.
-        """
-
-        response = self.cache.get("index") or self.connection.getIndexes()
-
-        for index in response["indexes"]["index"]:
-            for index in index["artist"]:
-                for item in self.walk_directory(index["id"]):
-                    yield item
-
-        for child in response["indexes"]["child"]:
-            if child.get("isDir"):
-                for child in self.walk_directory(child["id"]):
-                    yield child
-            else:
-                yield child
-
-    def walk_playlists(self):
-        """
-        Request SubSonic's playlists and iterate over each item.
-        """
-
-        response = self.cache.get("playlists") or \
-            self.connection.getPlaylists()
-
-        for child in response["playlists"]["playlist"]:
-            yield child
-
-    def walk_playlist(self, playlist_id):
-        """
-        Request SubSonic's playlist items and iterate over each item.
-        """
-
-        response = self.cache.get("playlist_%d" % playlist_id) or \
-            self.connection.getPlaylist(playlist_id)
-
-        for order, child in enumerate(response["playlist"]["entry"], start=1):
-            child["order"] = order
-            yield child
-
-    def walk_directory(self, directory_id):
-        """
-        Request a SubSonic music directory and iterate over each item.
-        """
-
-        response = self.connection.getMusicDirectory(directory_id)
-
-        for child in response["directory"]["child"]:
-            if child.get("isDir"):
-                for child in self.walk_directory(child["id"]):
-                    yield child
-            else:
-                yield child
-
-    def walk_artist(self, artist_id):
-        """
-        Request a SubSonic artist and iterate over each album.
-        """
-
-        response = self.connection.getArtist(artist_id)
-
-        for child in response["artist"]["album"]:
-            yield child
