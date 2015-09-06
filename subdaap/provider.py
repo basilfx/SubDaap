@@ -30,7 +30,7 @@ class Provider(provider.Provider):
         self.cache_manager = cache_manager
 
         self.setup_state()
-        self.setup_library()
+        self.setup_server()
 
     def setup_state(self):
         """
@@ -39,11 +39,10 @@ class Provider(provider.Provider):
         if "persistent_id" not in self.state:
             self.state["persistent_id"] = generate_persistent_id()
 
-    def setup_library(self):
+    def setup_server(self):
         """
         """
 
-        self.db.create_database(drop_all=False)
         self.server = Server(db=self.db)
 
         # Set server name and persistent ID.

@@ -56,6 +56,7 @@ class Application(object):
         """
 
         self.db = Database(self.config["Provider"]["database"])
+        self.db.create_database(drop_all=False)
 
     def setup_state(self):
         """
