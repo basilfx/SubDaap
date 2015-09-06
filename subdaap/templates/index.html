@@ -205,10 +205,12 @@
 
             <p>
                 Current size of the item cache is {{ cache_manager.item_cache.current_size|human_bytes }} of
-                {{ cache_manager.item_cache.max_size|human_bytes }} ({{ cache_manager.item_cache.items|length }} items)  and the
-                current size of the artwork cache is {{ cache_manager.artwork_cache.current_size|human_bytes }}
-                of {{ cache_manager.artwork_cache.max_size|human_bytes }} ({{ cache_manager.artwork_cache.items|length }} images).
-                The list below shows current items that are in use.
+                {{ cache_manager.item_cache.max_size|human_bytes }} ({{ cache_manager.item_cache.items|length }} items of which
+                {{ cache_manager.item_cache.permanent_cache_keys|length }} are permanent)  and the current size of the artwork
+                cache is {{ cache_manager.artwork_cache.current_size|human_bytes }} of
+                {{ cache_manager.artwork_cache.max_size|human_bytes }} ({{ cache_manager.artwork_cache.items|length }} images
+                of which {{ cache_manager.artwork_cache.permanent_cache_keys|length }} are permanent). The list below shows
+                current items that are in use.
             </p>
 
             <table class="pure-table">
