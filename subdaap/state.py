@@ -54,7 +54,7 @@ class State(object):
                 # Make sure it's a dict
                 if type(self.state) != dict:
                     self.state = {}
-            except (IOError, EOFError, cPickle.UnpicklingError):
+            except (EOFError, cPickle.UnpicklingError):
                 self.state = {}
 
     def __getitem__(self, key):
