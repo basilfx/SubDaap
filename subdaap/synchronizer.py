@@ -25,6 +25,8 @@ class Synchronizer(object):
         self.subsonic = subsonic
         self.index = index
 
+        self.is_initial_synced = False
+
         self.setup_state()
 
     def setup_state(self):
@@ -46,9 +48,9 @@ class Synchronizer(object):
         """
         """
 
-        error = True
-        changed = False
+        logger.info("Starting synchronization.")
 
+        changed = False
         state = self.state["synchronizers"][self.index]
 
         # Check connection version when initial is True. In this case, the
@@ -61,10 +63,16 @@ class Synchronizer(object):
             password=self.subsonic.password)
 
         if initial:
+            self.is_initial_synced = True
+
             if state["connection_version"] != connection_version:
                 logger.info("Initial synchronization is required.")
                 changed = True
             else:
+                # The initial state should be committed, even though no
+                # synchronization is required.
+                self.provider.update()
+
                 return
 
         # Start session
@@ -73,38 +81,54 @@ class Synchronizer(object):
                 # Prepare variables
                 self.cursor = cursor
 
-                self.items_by_remote_id = {}
+                # Determine version numbers
+                logger.debug("Synchronizing version numbers.")
+
+                self.sync_versions()
+
+                # Start synchronizing
+                logger.debug("Synchronizing database and base container.")
+
+                self.sync_database()
+                self.sync_base_container()
+
+                self.items_by_remote_id = self.cursor.query_dict(
+                    """
+                    SELECT
+                        `items`.`remote_id`,
+                        `items`.`id`,
+                        `items`.`checksum`
+                    FROM
+                        `items`
+                    WHERE
+                        `items`.`database_id` = ?
+                    """, self.database_id)
                 self.artists_by_remote_id = {}
                 self.albums_by_remote_id = {}
                 self.base_container_items_by_item_id = {}
                 self.containers_by_remote_id = {}
 
-                # Determine version numbers
-                self.sync_versions()
-
-                # Start synchronizing
-                self.sync_database()
-                self.sync_base_container()
-
                 # Items
+                logger.debug("Synchronizing items.")
+
                 if self.items_version != state.get("items_version"):
                     self.sync_items()
+                    changed = True
                 else:
                     logger.info("Items haven't been modified.")
 
                 # Containers
+                logger.debug("Synchronizing containers.")
+
                 if self.containers_version != state.get("containers_version"):
                     self.sync_containers()
+                    changed = True
                 else:
                     logger.info("Containers haven't been modified.")
 
             # Merge changes into the server. Lock access to provider because
             # multiple synchronizers could be active.
-            if self.update_server():
-                self.provider.update()
-
-                changed = True
-                error = False
+            self.update_server()
         finally:
             # Make sure that everything is cleaned up
             self.cursor = None
@@ -115,14 +139,15 @@ class Synchronizer(object):
             self.base_container_items_by_item_id = {}
             self.containers_by_remote_id = {}
 
-        # Update state if some things have changed.
+        # Update state if items and/or containers have changed.
         if changed:
-            if not error:
-                state["connection_version"] = connection_version
-                state["items_version"] = self.items_version
-                state["containers_version"] = self.containers_version
+            state["connection_version"] = connection_version
+            state["items_version"] = self.items_version
+            state["containers_version"] = self.containers_version
 
             self.state.save()
+
+        logger.info("Synchronization finished.")
 
     def update_server(self):
         """
@@ -156,10 +181,11 @@ class Synchronizer(object):
 
         # Update the server
         server = self.provider.server
+        database = server.databases[self.database_id]
+        base_container = database.containers[self.base_container_id]
 
         # Items
         if should_update(self.items_by_remote_id):
-            database = server.databases[self.database_id]
             database.items.remove_ids(removed_ids(self.items_by_remote_id))
             database.items.update_ids(updated_ids(self.items_by_remote_id))
 
@@ -168,7 +194,7 @@ class Synchronizer(object):
         # Base container and container items
         if should_update(self.base_container_items_by_item_id):
             database.containers.update_ids([self.base_container_id])
-            base_container = database.containers[self.base_container_id]
+
             base_container.container_items.remove_ids(
                 removed_ids(self.base_container_items_by_item_id))
             base_container.container_items.update_ids(
@@ -197,6 +223,9 @@ class Synchronizer(object):
         # Only update database if any of the above parts have changed.
         if changed:
             server.databases.update_ids([self.database_id])
+
+            # Notify provider of a new structure.
+            self.provider.update()
 
         return changed
 
@@ -388,17 +417,6 @@ class Synchronizer(object):
                     yield value["id"]
 
         # Index items, artists, albums and container items by remote IDs.
-        self.items_by_remote_id = self.cursor.query_dict(
-            """
-            SELECT
-                `items`.`remote_id`,
-                `items`.`id`,
-                `items`.`checksum`
-            FROM
-                `items`
-            WHERE
-                `items`.`database_id` = ?
-            """, self.database_id)
         self.artists_by_remote_id = self.cursor.query_dict(
             """
             SELECT

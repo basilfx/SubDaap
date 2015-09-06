@@ -83,12 +83,13 @@ class FileCache(object):
                         self.name, cache_file)
                     continue
 
-                permanent = cache_key in permanent_cache_keys
-
+                # Add it to the cache, but do not overwrite an existing item.
                 if cache_key not in self.items:
                     self.items[cache_key] = FileCacheItem()
-                    self.items[cache_key].size = os.stat(cache_file).st_size
-                    self.items[cache_key].permanent = permanent
+
+                self.items[cache_key].size = os.stat(cache_file).st_size
+                self.items[cache_key].permanent = \
+                    cache_key in permanent_cache_keys
 
         # Sum sizes of all non-permanent files
         size = 0
@@ -174,10 +175,11 @@ class FileCache(object):
             # is probably possible to recover by re-iterating this method, but
             # first want to make sure if this situation is likely to happen.
             if cache_item.ready is None:
-                raise Exception("Item unloaded while waiting.")
+                raise Exception("Item was unloaded while waiting.")
 
-        # Load the item from disk if it is not loaded. The lock is needed to
-        # prevent two concurrent requests from both loading a cache item.
+            logger.debug("%s: item '%s' is ready.", self.name, cache_key)
+
+        # Load the item from disk if it is not loaded.
         if cache_item.iterator is None:
             cache_item.ready.clear()
             self.load(cache_key, cache_item)
@@ -212,7 +214,9 @@ class FileCache(object):
                     if cache_item.ready:
                         cache_item.ready.clear()
 
-                    candidates.append((cache_key, cache_item))
+                        # Only unload items that have been ready.
+                        assert cache_item.iterator is not None
+                        candidates.append((cache_key, cache_item))
 
         for cache_key, cache_item in candidates:
             self.unload(cache_key, cache_item)
@@ -291,6 +295,7 @@ class FileCache(object):
                     "bytes while it was in cache.", self.name, cache_key,
                     cache_item.size, file_size)
 
+            # Correct the total cache size.
             if not cache_item.permanent:
                 self.current_size -= cache_item.size
                 self.current_size += file_size
@@ -395,10 +400,22 @@ class CacheManager(object):
     """
     """
 
-    def __init__(self, db, item_cache, artwork_cache):
+    def __init__(self, db, item_cache, artwork_cache, connections):
         self.db = db
         self.item_cache = item_cache
         self.artwork_cache = artwork_cache
+        self.connections = connections
+
+        self.setup_index()
+
+    def setup_index(self):
+        """
+        """
+
+        cached_items = self.get_cached_items()
+
+        self.artwork_cache.index(cached_items)
+        self.item_cache.index(cached_items)
 
     def get_cached_items(self):
         """
@@ -437,44 +454,41 @@ class CacheManager(object):
         """
 
         cached_items = self.get_cached_items()
-
-        self.artwork_cache.index(cached_items)
-        self.item_cache.index(cached_items)
-
         logger.info("Caching %d permanent items.", len(cached_items))
 
         for item_id in cached_items:
-            logger.debug("Caching item '%d'.", item_id)
-
             database_id = cached_items[item_id]["database_id"]
             remote_id = cached_items[item_id]["remote_id"]
             file_suffix = cached_items[item_id]["file_suffix"]
 
             # Artwork
-            if not self.artwork_cache.contains(item_id):
+            if item_id not in self.artwork_cache.items:
+                logger.debug("Artwork with key '%d' not in cache.", item_id)
                 cache_item = self.artwork_cache.get(item_id)
 
-                if cache_item.ready is None:
-                    remote_fd = self.connections[database_id].getCoverArt(
-                        remote_id)
+                if not cache_item.ready.is_set():
+                    remote_fd = self.connections[database_id].get_artwork_fd(
+                        remote_id, file_suffix)
                     self.artwork_cache.download(item_id, cache_item, remote_fd)
 
                     # Exhaust iterator so it downloads the artwork.
                     exhaust(cache_item.iterator())
-                self.artwork_cache.unload(item_id, cache_item)
 
             # Items
-            if not self.item_cache.contains(item_id):
+            if item_id not in self.item_cache.items:
+                logger.debug("Item with key '%d' not in cache.", item_id)
                 cache_item = self.item_cache.get(item_id)
 
-                if cache_item.ready is None:
-                    remote_fd = self.get_item_fd(
-                        database_id, remote_id, file_suffix)
+                if not cache_item.ready.is_set():
+                    remote_fd = self.connections[database_id].get_item_fd(
+                        remote_id, file_suffix)
                     self.item_cache.download(item_id, cache_item, remote_fd)
 
                     # Exhaust iterator so it downloads the item.
                     exhaust(cache_item.iterator())
-                self.item_cache.unload(item_id, cache_item)
+
+        # Cleanup left-overs of all items that are loaded.
+        self.expire()
 
         logger.info("Caching permanent items finished.")
 
