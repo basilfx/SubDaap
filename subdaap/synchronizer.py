@@ -407,6 +407,10 @@ class Synchronizer(object):
             return item["artistId"] in self.artists_by_remote_id and \
                 "updated" in self.artists_by_remote_id[item["artistId"]]
 
+        def is_synthetic_artist_processed(item):
+            return item["artist"] in self.synthetic_artists_by_name and \
+                "updated" in self.synthetic_artists_by_name[item["artist"]]
+
         def is_album_processed(album):
             return album["artistId"] in self.albums_by_remote_id and  \
                 "updated" in self.albums_by_remote_id[album["artistId"]]
@@ -426,7 +430,20 @@ class Synchronizer(object):
             FROM
                 `artists`
             WHERE
-                `artists`.`database_id` = ?
+                `artists`.`database_id` = ? AND
+                `artists`.`remote_id` IS NOT NULL
+            """, self.database_id)
+        self.synthetic_artists_by_name = self.cursor.query_dict(
+            """
+            SELECT
+                `artists`.`name`,
+                `artists`.`id`,
+                `artists`.`checksum`
+            FROM
+                `artists`
+            WHERE
+                `artists`.`database_id` = ? AND
+                `artists`.`remote_id` IS NULL
             """, self.database_id)
         self.albums_by_remote_id = self.cursor.query_dict(
             """
@@ -460,6 +477,9 @@ class Synchronizer(object):
                     for album in self.subsonic.walk_artist(item["artistId"]):
                         if not is_album_processed(album):
                             self.sync_album(album)
+            elif "artist" in item:
+                if not is_synthetic_artist_processed(item):
+                    self.sync_synthetic_artist(item)
 
             self.sync_item(item)
             self.sync_base_container_item(item)
@@ -482,8 +502,16 @@ class Synchronizer(object):
             DELETE FROM
                 `artists`
             WHERE
-                `artists`.`id` IN (%s)
+                `artists`.`id` IN (%s) AND
+                `artists`.`remote_id` IS NOT NULL
             """ % utils.in_list(removed_ids(self.artists_by_remote_id)))
+        self.cursor.query("""
+            DELETE FROM
+                `artists`
+            WHERE
+                `artists`.`id` IN (%s) AND
+                `artists`.`remote_id` IS NULL
+            """ % utils.in_list(removed_ids(self.synthetic_artists_by_name)))
         self.cursor.query("""
             DELETE FROM
                 `albums`
@@ -501,9 +529,19 @@ class Synchronizer(object):
                     return artist
 
         checksum = utils.dict_checksum(item)
+
         album = self.albums_by_remote_id.get(item.get("albumId"))
         artist = self.artists_by_remote_id.get(item.get("artistId"))
         album_artist = find_artist_by_id(album["artist_id"]) if album else None
+
+        # The artist can be none, which is the case for items with featuring
+        # artists.
+        if artist is None and item.get("artist"):
+            artist = self.synthetic_artists_by_name.get(item["artist"])
+
+        # If there still is no artist, use the album artist.
+        if not artist and album_artist:
+            artist = album_artist
 
         # Fetch existing item
         try:
@@ -697,6 +735,60 @@ class Synchronizer(object):
         # Update cache
         self.artists_by_remote_id[item["artistId"]] = {
             "remote_id": item["artistId"],
+            "id": artist_id,
+            "checksum": checksum,
+            "updated": updated
+        }
+
+    def sync_synthetic_artist(self, item):
+        """
+        """
+
+        checksum = utils.dict_checksum(name=item["artist"])
+
+        # Fetch existing item
+        try:
+            row = self.synthetic_artists_by_name[item["artist"]]
+        except KeyError:
+            row = None
+
+        # To insert or to update
+        updated = True
+
+        if row is None:
+            artist_id = self.cursor.query(
+                """
+                INSERT INTO `artists` (
+                    `database_id`,
+                    `name`,
+                    `checksum`)
+                VALUES
+                    (?, ?, ?)
+                """,
+                self.database_id,
+                item["artist"],
+                checksum).lastrowid
+        elif row["checksum"] != checksum:
+            artist_id = row["id"]
+            self.cursor.query(
+                """
+                UPDATE
+                    `artists`
+                SET
+                    `name` = ?,
+                    `checksum` = ?
+                WHERE
+                    `artists`.`id` = ?
+                """,
+                item["artist"],
+                checksum,
+                artist_id)
+        else:
+            updated = False
+            artist_id = row["id"]
+
+        # Update cache
+        self.synthetic_artists_by_name[item["artist"]] = {
             "id": artist_id,
             "checksum": checksum,
             "updated": updated
