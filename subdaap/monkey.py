@@ -28,6 +28,23 @@ def patch_pypy():
     sqlite3.connect = lambda x: old_connect(x, check_same_thread=False)
 
 
+def patch_zeroconf():
+    """
+    Monkey patch Zeroconf so the select timeout can be disabled when running
+    with gevent. Saves some wakeups.
+    """
+
+    import zeroconf
+
+    def new_init(self, *args, **kwargs):
+        old_init(self, *args, **kwargs)
+        self.timeout = None
+
+    old_init = zeroconf.Engine.__init__
+    zeroconf.Engine.__init__ = new_init
+
+
 # Apply all patches
 patch_all()
 patch_pypy()
+patch_zeroconf()
