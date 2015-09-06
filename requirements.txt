@@ -1,5 +1,5 @@
 Cython
 py-sonic
 configobj
-flask-daapserver
-apscheduler
+flask-daapserver>=3.0.0
+apscheduler>=3.0.0

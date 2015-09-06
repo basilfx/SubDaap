@@ -27,19 +27,23 @@ This application was designed as a gateway between SubSonic and iTunes. Therefor
 * `chmod 700 config.ini`, so others cannot view your credentials!
 
 To start this service when your computer starts:
-* On OS X
+* On OS X:
   * Copy `init/init.osx` to `~/Library/LaunchAgents/com.basilfx.subdaap.plist`. Do not symlink!
   * Edit the file accordingly. Make sure all paths are correct.
   * Run `launchctl load  ~/Library/LaunchAgents/com.basilfx.subdaap.plist`
+* On Ubuntu:
+  * Copy `init/systemd.service` to `/etc/systemd/system/subdaap.serice`.
+  * Edit the file accordingly. Make sure all paths are correct and the user `subdaap` exists.
+  * Run `systemctl enable subdaap`.
 
 ## Run the application
 To run the application, use the following command, or similar:
 
 ```
-python SubDaap.py --config config.ini --data-dir path/to/datadir --pid-file /var/run/subdaap.pid
+python SubDaap.py --config-file config.ini --data-dir path/to/datadir --pid-file /var/run/subdaap.pid
 ```
 
-The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for more verbose. All paths in the command line are relative to where you run it from.
+The data directory should exist. Optionally, add `-v` for verbose, or `-vv` for more verbose. All paths in the command line are relative to where you run it from. Any paths in `config.ini` are relative to the `--data-dir`.
 
 Add `--daemon` to run the program in the background.
 

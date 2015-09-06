@@ -1,7 +1,7 @@
 # Changelog
 
 ## v2.0.0
-Released XX September 2015
+Released 06 September 2015
 
 Highlights:
 * Improved: better synchronization.
@@ -14,7 +14,7 @@ Highlights:
 The full list of commits can be found [here](https://github.com/basilfx/SubDaap/compare/v1.2.1...v2.0.0).
 
 ## v1.2.1
-Released 05 september 2015
+Released 05 September 2015
 
 Highlights:
 * Fixed: various code fixes that have been introduced by accident (issue #5).

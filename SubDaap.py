@@ -1,4 +1,4 @@
-from subdaap import monkey # noqa
+from subdaap import monkey  # noqa
 
 from subdaap.application import Application
 
@@ -43,8 +43,13 @@ def parse_arguments():
     return parser.parse_args(), parser
 
 
-def setup_logging(console=True, log_file=False, verbose=False):
+def setup_logging(console=True, log_file=None, verbose=False):
     """
+    Setup logging.
+
+    :param bool console: If True, log to console.
+    :param str log_file: If set, log to a file (append) as specified.
+    :param bool verbose: Enable debug logging if True.
     """
 
     # Configure logging

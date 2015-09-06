@@ -11,14 +11,15 @@ class SubsonicClient(libsonic.Connection):
     - Parse URL for host and port for constructor.
     - Make sure API results are of of uniform type.
     - Add transcoding options for internal use
-
-    :param str url: Full URL (including scheme) of the SubSonic server.
-    :param str username: Username of the server.
-    :param str password: Password of the server.
     """
 
     def __init__(self, url, username, password):
         """
+        Construct a new SubsonicClient.
+
+        :param str url: Full URL (including scheme) of the SubSonic server.
+        :param str username: Username of the server.
+        :param str password: Password of the server.
         """
 
         # Parse SubSonic URL
@@ -44,6 +45,7 @@ class SubsonicClient(libsonic.Connection):
 
     def getIndexes(self, *args, **kwargs):
         """
+        Improve the getIndexes method. Ensures IDs are integers.
         """
 
         def _artists_iterator(artists):
@@ -82,6 +84,7 @@ class SubsonicClient(libsonic.Connection):
 
     def getPlaylists(self, *args, **kwargs):
         """
+        Improve the getPlaylists method. Ensures IDs are integers.
         """
 
         def _playlists_iterator(playlists):
@@ -97,6 +100,7 @@ class SubsonicClient(libsonic.Connection):
 
     def getPlaylist(self, *args, **kwargs):
         """
+        Improve the getPlaylist method. Ensures IDs are integers.
         """
 
         def _entries_iterator(entries):
@@ -112,6 +116,7 @@ class SubsonicClient(libsonic.Connection):
 
     def getArtist(self, *args, **kwargs):
         """
+        Improve the getArtist method. Ensures IDs are integers.
         """
 
         def _albums_iterator(albums):
@@ -131,6 +136,7 @@ class SubsonicClient(libsonic.Connection):
 
     def getMusicDirectory(self, *args, **kwargs):
         """
+        Improve the getMusicDirectory method. Ensures IDs are integers.
         """
 
         def _children_iterator(children):

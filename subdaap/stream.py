@@ -13,6 +13,11 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
     download and caching. Every time another block (of interest, depending on
     start and stop) is available, it will be written to the queue. The streamer
     blocks until a block of interest is available.
+
+    :param file remote_fd: File descriptor of remote file to stream.
+    :param str target_file: Path to target file name. Must be writeable.
+    :param int chunk_size: Chunk size to use when reading remote.
+    :param callable on_cache: Callback method to invoke when streaming is done.
     """
 
     temp_file = "%s.temp" % target_file
