@@ -2,6 +2,7 @@ from gevent.lock import Semaphore
 
 import cPickle
 import logging
+import errno
 
 # Logger instance
 logger = logging.getLogger(__name__)
@@ -54,29 +55,34 @@ class State(object):
                 # Make sure it's a dict
                 if type(self.state) != dict:
                     self.state = {}
+            except IOError as e:
+                if e.errno == errno.ENOENT:
+                    self.state = {}
+                else:
+                    raise e
             except (EOFError, cPickle.UnpicklingError):
                 self.state = {}
 
     def __getitem__(self, key):
         """
-        Proxy method
+        Proxy method for `self.state.__getitem__`.
         """
         return self.state.__getitem__(key)
 
     def __setitem__(self, key, value):
         """
-        Proxy method
+        Proxy method for `self.state.__setitem__`.
         """
         self.state.__setitem__(key, value)
 
     def __contains__(self, key):
         """
-        Proxy method
+        Proxy method for `self.state.__contains__`.
         """
         return self.state.__contains__(key)
 
     def __len__(self):
         """
-        Proxy method
+        Proxy method for `self.state.__len__`.
         """
         return self.state.__len__()
