@@ -77,7 +77,7 @@ def extend_server_app(application, app):
 
         # Synchronize action
         elif action == "synchronize":
-            application.synchronize()
+            application.synchronize(synchronization="manual")
 
         # Return back to index
         return redirect(url_for("index"))

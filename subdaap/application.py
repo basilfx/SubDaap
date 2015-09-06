@@ -195,6 +195,8 @@ class Application(object):
         count = 0
         connections = connections or self.connections.values()
 
+        logger.debug("Synchronization triggered via '%s'.", synchronization)
+
         for connection in connections:
             if synchronization == "interval":
                 if connection.synchronization == "interval":
@@ -209,11 +211,10 @@ class Application(object):
                 connection.synchronizer.synchronize()
                 count += 1
 
+        logger.debug("Synchronized %d connections.", count)
+
         # Update the cache.
         self.cache_manager.cache()
-
-        # Logging
-        logger.debug("Synchronized %d connections", count)
 
     def start(self):
         """
