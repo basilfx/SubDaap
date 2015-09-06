@@ -1,0 +1,12 @@
+[Unit]
+Description=SubDaap - play your favorite tunes from SubSonic in iTunes.
+
+[Service]
+WorkingDirectory=/opt/subdaap
+ExecStart=SubDaap.py --data-dir /var/lib/subdaap/ --config-file /var/lib/subdaap/config.ini --pid-file /var/run/subdaap/subdaap.pid --log-file /var/log/subdaap/subdaap.log
+Type=simple
+User=subdaap
+Group=subdaap
+
+[Install]
+WantedBy=multi-user.target

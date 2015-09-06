@@ -9,7 +9,6 @@
         <string>com.basilfx.subdaap</string>
         <key>ProgramArguments</key>
         <array>
-            <!-- <string>/usr/bin/pypy</string> -->
             <string>/usr/bin/python</string>
             <string>SubDaap.py</string>
             <string>--data-dir</string>
