@@ -184,7 +184,7 @@ class Synchronizer(object):
                 updated_ids(self.containers_by_remote_id))
 
             for container in self.containers_by_remote_id.itervalues():
-                if "updated" not in container:
+                if "updated" in container:
                     updated_ids = container["container_items"]
                     container = database.containers[container["id"]]
 
