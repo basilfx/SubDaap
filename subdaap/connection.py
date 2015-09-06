@@ -1,6 +1,11 @@
 from subdaap.subsonic import SubsonicClient
 from subdaap.synchronizer import Synchronizer
 
+import logging
+
+# Logger instance
+logger = logging.getLogger(__name__)
+
 
 class Connection(object):
     """
@@ -76,3 +81,25 @@ class Connection(object):
         return self.transcode == "all" or (
             self.transcode == "unsupported" and
             file_suffix.lower() in self.transcode_unsupported)
+
+    def get_item_fd(self, remote_id, file_suffix):
+        """
+        Get a file descriptor of remote connection of an item, based on
+        transcoding settings.
+        """
+
+        if self.needs_transcoding(file_suffix):
+            logger.debug(
+                "Transcoding item '%d' with file suffix '%s'.",
+                remote_id, file_suffix)
+            return self.subsonic.stream(
+                remote_id, tformat="mp3")
+        else:
+            return self.subsonic.download(remote_id)
+
+    def get_artwork_fd(self, remote_id, file_suffix):
+        """
+        Get a file descriptor of a remote connection of an artwork item.
+        """
+
+        return self.subsonic.getCoverArt(remote_id)

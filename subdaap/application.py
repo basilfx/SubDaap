@@ -36,8 +36,8 @@ class Application(object):
         self.setup_config()
         self.setup_database()
         self.setup_state()
-        self.setup_cache()
         self.setup_connections()
+        self.setup_cache()
         self.setup_provider()
         self.setup_server()
         self.setup_tasks()
@@ -87,7 +87,10 @@ class Application(object):
 
         # Create a cache manager
         self.cache_manager = cache.CacheManager(
-            self.db, item_cache, artwork_cache)
+            db=self.db,
+            item_cache=item_cache,
+            artwork_cache=artwork_cache,
+            connections=self.connections)
 
     def setup_connections(self):
         """

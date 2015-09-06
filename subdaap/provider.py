@@ -53,12 +53,13 @@ class Provider(provider.Provider):
         """
         """
 
-        connection = self.connections[item.database_id]
-        cache_item = self.artwork_cache.get(item.id)
+        cache_item = self.cache_manager.artwork_cache.get(item.id)
 
         if cache_item.iterator is None:
-            remote_fd = connection.subsonic.getCoverArt(item.remote_id)
-            self.artwork_cache.download(item.id, cache_item, remote_fd)
+            remote_fd = self.connections[item.database_id].get_artwork_fd(
+                item.remote_id, item.file_suffix)
+            self.cache_manager.artwork_cache.download(
+                item.id, cache_item, remote_fd)
 
             return cache_item.iterator(), None, None
         return cache_item.iterator(), None, cache_item.size
@@ -67,31 +68,15 @@ class Provider(provider.Provider):
         """
         """
 
-        cache_item = self.item_cache.get(item.id)
+        cache_item = self.cache_manager.item_cache.get(item.id)
 
         if cache_item.iterator is None:
-            remote_fd = self.get_item_fd(
-                item.database_id, item.remote_id, item.file_suffix)
-            self.item_cache.download(item.id, cache_item, remote_fd)
+            remote_fd = self.connections[item.database_id].get_item_fd(
+                item.remote_id, item.file_suffix)
+            self.cache_manager.item_cache.download(
+                item.id, cache_item, remote_fd)
 
             return cache_item.iterator(byte_range), item.file_type, \
                 item.file_size
         return cache_item.iterator(byte_range), item.file_type, \
             cache_item.size
-
-    def get_item_fd(self, database_id, remote_id, file_suffix):
-        """
-        Get a file descriptor of remote connection, based on transcoding
-        settings.
-        """
-
-        connection = self.connections[database_id]
-
-        if connection.needs_transcoding(file_suffix):
-            logger.debug(
-                "Transcoding item '%d' with file suffix '%s'.",
-                remote_id, file_suffix)
-            return connection.subsonic.stream(
-                remote_id, tformat="mp3")
-        else:
-            return connection.subsonic.download(remote_id)
