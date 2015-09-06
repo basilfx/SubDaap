@@ -161,33 +161,56 @@ class Application(object):
 
         self.scheduler = GeventScheduler()
 
+        # Add an initial job
+        def _job():
+            job.remove()
+            self.synchronize(synchronization="startup")
+        job = self.scheduler.add_job(
+            _job, max_instances=1, trigger="interval", seconds=1)
+
         # Scheduler task to clean and expire the cache.
         self.scheduler.add_job(
-            self.cache_manager.expire, trigger="interval", minutes=5)
+            self.cache_manager.expire,
+            max_instances=1, trigger="interval", minutes=5)
         self.scheduler.add_job(
-            self.cache_manager.clean, trigger="interval", minutes=30)
+            self.cache_manager.clean,
+            max_instances=1, trigger="interval", minutes=30)
 
         # Schedule tasks to synchronize each connection.
         for connection in self.connections.itervalues():
             self.scheduler.add_job(
-                self.synchronize, args=([connection]),
-                trigger="interval",
+                self.synchronize, args=([connection, "interval"]),
+                max_instances=1, trigger="interval",
                 minutes=connection.synchronization_interval)
 
-    def synchronize(self, connections=None):
+    def synchronize(self, connections=None, synchronization="manual"):
         """
+        Synchronize selected connections (or all) given a synchronization
+        event.
         """
 
+        count = 0
         connections = connections or self.connections.values()
 
         for connection in connections:
-            connection.synchronizer.synchronize()
+            if synchronization == "interval":
+                if connection.synchronization == "interval":
+                    connection.synchronizer.synchronize()
+                    count += 1
+            elif synchronization == "startup":
+                if connection.synchronization == "startup":
+                    if not connection.is_initial_synced:
+                        connection.synchronizer.synchronize()
+                        count += 1
+            elif synchronization == "manual":
+                connection.synchronizer.synchronize()
+                count += 1
 
         # Update the cache.
         self.cache_manager.cache()
 
-        # Clean expired items.
-        self.cache_manager.clean()
+        # Logging
+        logger.debug("Synchronized %d connections", count)
 
     def start(self):
         """
