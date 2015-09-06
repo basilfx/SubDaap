@@ -433,6 +433,7 @@ class Synchronizer(object):
             SELECT
                 `albums`.`remote_id`,
                 `albums`.`id`,
+                `albums`.`artist_id`,
                 `albums`.`checksum`
             FROM
                 `albums`
@@ -494,9 +495,15 @@ class Synchronizer(object):
         """
         """
 
+        def find_artist_by_id(artist_id):
+            for artist in self.artists_by_remote_id.itervalues():
+                if artist["id"] == artist_id:
+                    return artist
+
         checksum = utils.dict_checksum(item)
-        artist = self.artists_by_remote_id.get(item.get("artistId"))
         album = self.albums_by_remote_id.get(item.get("albumId"))
+        artist = self.artists_by_remote_id.get(item.get("artistId"))
+        album_artist = find_artist_by_id(album["artist_id"]) if album else None
 
         # Fetch existing item
         try:
@@ -514,6 +521,7 @@ class Synchronizer(object):
                     `persistent_id`,
                     `database_id`,
                     `artist_id`,
+                    `album_artist_id`,
                     `album_id`,
                     `name`,
                     `genre`,
@@ -528,11 +536,12 @@ class Synchronizer(object):
                     `checksum`,
                     `remote_id`)
                 VALUES
-                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 generate_persistent_id(),
                 self.database_id,
                 artist["id"] if artist else None,
+                album_artist["id"] if album_artist else None,
                 album["id"] if album else None,
                 item.get("title"),
                 item.get("genre"),
@@ -554,6 +563,7 @@ class Synchronizer(object):
                     `items`
                 SET
                     `artist_id` = ?,
+                    `album_artist_id` = ?,
                     `album_id` = ?,
                     `name` = ?,
                     `genre` = ?,
@@ -570,6 +580,7 @@ class Synchronizer(object):
                     `items`.`id` = ?
                 """,
                 artist["id"] if artist else None,
+                album_artist["id"] if album_artist else None,
                 album["id"] if album else None,
                 item.get("title"),
                 item.get("genre"),
@@ -751,6 +762,7 @@ class Synchronizer(object):
         self.albums_by_remote_id[album["id"]] = {
             "remote_id": album["id"],
             "id": album_id,
+            "artist_id": artist_row["id"],
             "checksum": checksum,
             "updated": updated
         }

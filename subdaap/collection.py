@@ -32,13 +32,17 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 FROM
                     `items`
                 LEFT OUTER JOIN
-                    `artists` ON `items`.`artist_id`=`artists`.`id`
+                    `artists` ON `items`.`artist_id` = `artists`.`id`
                 LEFT OUTER JOIN
-                    `albums` ON `items`.`album_id`=`albums`.`id`
+                    `artists` AS `album_artists` ON
+                        `items`.`album_artist_id` = `album_artists`.`id`
+                LEFT OUTER JOIN
+                    `albums` ON `items`.`album_id` = `albums`.`id`
                 WHERE
                     `items`.`database_id` = ? AND
                     `items`.`exclude` = 0 AND
                     COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`album_artists`.`exclude`, 0) = 0 AND
                     COALESCE(`albums`.`exclude`, 0) = 0
                 LIMIT 1
                 """, self.parent.id
@@ -60,16 +64,20 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 FROM
                     `container_items`
                 INNER JOIN
-                    `items` ON `container_items`.`item_id`=`items`.`id`
+                    `items` ON `container_items`.`item_id` = `items`.`id`
                 LEFT OUTER JOIN
-                    `artists` ON `items`.`artist_id`=`artists`.`id`
+                    `artists` ON `items`.`artist_id` = `artists`.`id`
                 LEFT OUTER JOIN
-                    `albums` ON `items`.`album_id`=`albums`.`id`
+                    `artists` AS `album_artists` ON
+                        `items`.`album_artist_id` = `album_artists`.`id`
+                LEFT OUTER JOIN
+                    `albums` ON `items`.`album_id` = `albums`.`id`
                 WHERE
                     `container_items`.`database_id` = ? AND
                     `container_items`.`container_id` = ? AND
                     COALESCE(`items`.`exclude`, 0) = 0 AND
                     COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`album_artists`.`exclude`, 0) = 0 AND
                     COALESCE(`albums`.`exclude`, 0) = 0
                 LIMIT 1
                 """, self.parent.id, self.parent.database_id
@@ -134,6 +142,7 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                     `items`.`file_suffix`,
                     `items`.`genre`,
                     `artists`.`name` as `artist`,
+                    `album_artists`.`name` as `album_artist`,
                     `albums`.`name` as `album`,
                     `albums`.`art` as `album_art`
                 FROM
@@ -141,11 +150,15 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 LEFT OUTER JOIN
                     `artists` ON `items`.`artist_id` = `artists`.`id`
                 LEFT OUTER JOIN
+                    `artists` AS `album_artists` ON
+                        `items`.`album_artist_id` = `album_artists`.`id`
+                LEFT OUTER JOIN
                     `albums` ON `items`.`album_id` = `albums`.`id`
                 WHERE
                     `items`.`database_id` = ? AND
                     `items`.`exclude` = 0 AND
                     COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`album_artists`.`exclude`, 0) = 0 AND
                     COALESCE(`albums`.`exclude`, 0) = 0
                     %s
                 """ % in_clause, self.parent.id
@@ -179,11 +192,15 @@ class LazyMutableCollection(collection.LazyMutableCollection):
                 LEFT OUTER JOIN
                     `artists` ON `items`.`artist_id` = `artists`.`id`
                 LEFT OUTER JOIN
+                    `artists` AS `album_artists` ON
+                        `items`.`album_artist_id` = `album_artists`.`id`
+                LEFT OUTER JOIN
                     `albums` ON `items`.`album_id` = `albums`.`id`
                 WHERE
                     `container_items`.`container_id` = ? AND
                     COALESCE(`items`.`exclude`, 0) = 0 AND
                     COALESCE(`artists`.`exclude`, 0) = 0 AND
+                    COALESCE(`album_artists`.`exclude`, 0) = 0 AND
                     COALESCE(`albums`.`exclude`, 0) = 0
                     %s
                 """ % in_clause, self.parent.id

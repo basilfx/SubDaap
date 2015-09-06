@@ -129,6 +129,7 @@ class Database(object):
                         `persistent_id` INTEGER NOT NULL,
                         `database_id` int(11) NOT NULL,
                         `artist_id` int(11) DEFAULT NULL,
+                        `album_artist_id` int(11) DEFAULT NULL,
                         `album_id` int(11) DEFAULT NULL,
                         `name` varchar(255) DEFAULT NULL,
                         `genre` varchar(255) DEFAULT NULL,
@@ -149,6 +150,8 @@ class Database(object):
                         CONSTRAINT `item_fk_2` FOREIGN KEY (`album_id`)
                             REFERENCES `albums` (`id`),
                         CONSTRAINT `item_fk_3` FOREIGN KEY (`artist_id`)
+                            REFERENCES `artists` (`id`)
+                        CONSTRAINT `item_fk_4` FOREIGN KEY (`album_artist_id`)
                             REFERENCES `artists` (`id`)
                     );
                     CREATE TABLE IF NOT EXISTS `containers` (
