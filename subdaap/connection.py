@@ -93,7 +93,7 @@ class Connection(object):
                 "Transcoding item '%d' with file suffix '%s'.",
                 remote_id, file_suffix)
             return self.subsonic.stream(
-                remote_id, tformat="mp3", estimateContentLength=True)
+                remote_id, tformat="mp3")
         else:
             return self.subsonic.download(remote_id)
 
