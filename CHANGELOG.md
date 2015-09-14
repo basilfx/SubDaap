@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.1
+Released 14 September 2015
+
+Highlights:
+* Fixed: synchronization issues when neither items nor containers have changed.
+* Improved: connection with Subsonic.
+
+The full list of commits can be found [here](https://github.com/basilfx/SubDaap/compare/v2.0.0...v2.0.1).
+
 ## v2.0.0
 Released 06 September 2015
 
