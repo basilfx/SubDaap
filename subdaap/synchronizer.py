@@ -50,7 +50,10 @@ class Synchronizer(object):
 
         logger.info("Starting synchronization.")
 
-        changed = False
+        server_changed = False
+        items_changed = False
+        containers_changed = False
+
         state = self.state["synchronizers"][self.index]
 
         # Check connection version when initial is True. In this case, the
@@ -67,7 +70,7 @@ class Synchronizer(object):
 
             if state["connection_version"] != connection_version:
                 logger.info("Initial synchronization is required.")
-                changed = True
+                server_changed = True
             else:
                 # The initial state should be committed, even though no
                 # synchronization is required.
@@ -113,7 +116,7 @@ class Synchronizer(object):
 
                 if self.items_version != state.get("items_version"):
                     self.sync_items()
-                    changed = True
+                    items_changed = True
                 else:
                     logger.info("Items haven't been modified.")
 
@@ -122,13 +125,13 @@ class Synchronizer(object):
 
                 if self.containers_version != state.get("containers_version"):
                     self.sync_containers()
-                    changed = True
+                    containers_changed = True
                 else:
                     logger.info("Containers haven't been modified.")
 
             # Merge changes into the server. Lock access to provider because
             # multiple synchronizers could be active.
-            self.update_server()
+            self.update_server(items_changed, containers_changed)
         finally:
             # Make sure that everything is cleaned up
             self.cursor = None
@@ -140,7 +143,7 @@ class Synchronizer(object):
             self.containers_by_remote_id = {}
 
         # Update state if items and/or containers have changed.
-        if changed:
+        if items_changed or containers_changed or server_changed:
             state["connection_version"] = connection_version
             state["items_version"] = self.items_version
             state["containers_version"] = self.containers_version
@@ -149,7 +152,7 @@ class Synchronizer(object):
 
         logger.info("Synchronization finished.")
 
-    def update_server(self):
+    def update_server(self, items_changed, containers_changed):
         """
         """
 
@@ -185,38 +188,40 @@ class Synchronizer(object):
         base_container = database.containers[self.base_container_id]
 
         # Items
-        if should_update(self.items_by_remote_id):
-            database.items.remove_ids(removed_ids(self.items_by_remote_id))
-            database.items.update_ids(updated_ids(self.items_by_remote_id))
+        if items_changed:
+            if should_update(self.items_by_remote_id):
+                database.items.remove_ids(removed_ids(self.items_by_remote_id))
+                database.items.update_ids(updated_ids(self.items_by_remote_id))
 
-            changed = True
+                changed = True
 
-        # Base container and container items
-        if should_update(self.base_container_items_by_item_id):
-            database.containers.update_ids([self.base_container_id])
+            # Base container and container items
+            if should_update(self.base_container_items_by_item_id):
+                database.containers.update_ids([self.base_container_id])
 
-            base_container.container_items.remove_ids(
-                removed_ids(self.base_container_items_by_item_id))
-            base_container.container_items.update_ids(
-                updated_ids(self.base_container_items_by_item_id))
+                base_container.container_items.remove_ids(
+                    removed_ids(self.base_container_items_by_item_id))
+                base_container.container_items.update_ids(
+                    updated_ids(self.base_container_items_by_item_id))
 
-            changed = True
+                changed = True
 
         # Other containers and container items
-        if should_update(self.containers_by_remote_id):
-            database.containers.remove_ids(
-                removed_ids(self.containers_by_remote_id))
-            database.containers.update_ids(
-                updated_ids(self.containers_by_remote_id))
+        if containers_changed:
+            if should_update(self.containers_by_remote_id):
+                database.containers.remove_ids(
+                    removed_ids(self.containers_by_remote_id))
+                database.containers.update_ids(
+                    updated_ids(self.containers_by_remote_id))
 
-            for container in self.containers_by_remote_id.itervalues():
-                if "updated" in container:
-                    updated_ids = container["container_items"]
-                    container = database.containers[container["id"]]
+                for container in self.containers_by_remote_id.itervalues():
+                    if "updated" in container:
+                        updated_ids = container["container_items"]
+                        container = database.containers[container["id"]]
 
-                    container.container_items.remove_ids(
-                        container.container_items)
-                    container.container_items.update_ids(updated_ids)
+                        container.container_items.remove_ids(
+                            container.container_items)
+                        container.container_items.update_ids(updated_ids)
 
             changed = True
 
@@ -225,6 +230,7 @@ class Synchronizer(object):
             server.databases.update_ids([self.database_id])
 
             # Notify provider of a new structure.
+            logger.debug("Notifying provider that structure has changed.")
             self.provider.update()
 
         return changed
