@@ -172,7 +172,7 @@ class Synchronizer(object):
             return False
 
         def has_removed_ids(items):
-            for _ in updated_ids(items):
+            for _ in removed_ids(items):
                 return True
             return False
 
