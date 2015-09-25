@@ -1,3 +1,5 @@
+import collections
+
 from subdaap.subsonic import SubsonicClient
 from subdaap.synchronizer import Synchronizer
 
@@ -12,6 +14,7 @@ class Connection(object):
     A connection represents a remote server and provides all the instances
     required to connect and synchronize.
     """
+    transcode_format = collections.defaultdict(lambda: 'audio/mpeg')
 
     def __init__(self, state, db, index, name, url, username, password,
                  synchronization, synchronization_interval, transcode,
@@ -93,7 +96,7 @@ class Connection(object):
                 "Transcoding item '%d' with file suffix '%s'.",
                 remote_id, file_suffix)
             return self.subsonic.stream(
-                remote_id, tformat="mp3")
+                remote_id, tformat=self.transcode_format)
         else:
             return self.subsonic.download(remote_id)
 
