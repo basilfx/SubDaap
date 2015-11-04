@@ -239,12 +239,8 @@ class Synchronizer(object):
         """
         Read the remote index and playlists. Return their versions, so it can
         be decided if synchronization is required.
-        For the index, a `lastModified` field is available in SubSonic's
-        response message. This is not the case for playlists, so the naive
-        approach is to fetch all playlists, calulate a checksum and compare. A
-        request for a similar feature is addressed in
-        http://forum.subsonic.org/forum/viewtopic.php?f=3&t=13972.
-        Because the index and playlists are reused, they are stored in cache.
+        For the index, a `lastModified` property is available in SubSonic's
+        responses. A similar property exists for playlists since SubSonic 5.3.
         """
 
         state = self.state["synchronizers"][self.index]
@@ -265,9 +261,7 @@ class Synchronizer(object):
         response = self.subsonic.getPlaylists()
 
         for playlist in response["playlists"]["playlist"]:
-            response = self.subsonic.getPlaylist(playlist["id"])
-
-            containers_checksum = utils.dict_checksum(response["playlist"])
+            containers_checksum = utils.dict_checksum(playlist)
             containers_version = (containers_version + containers_checksum) \
                 % 0xFFFFFFFF
 
