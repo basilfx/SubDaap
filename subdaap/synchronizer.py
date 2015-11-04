@@ -885,7 +885,9 @@ class Synchronizer(object):
         # Iterate over each playlist.
         for container in self.subsonic.walk_playlists():
             self.sync_container(container)
-            self.sync_container_items(container)
+
+            if self.containers_by_remote_id[container["id"]]["updated"]:
+                self.sync_container_items(container)
 
         # Delete old containers and container items.
         self.cursor.query("""
@@ -901,7 +903,7 @@ class Synchronizer(object):
 
         checksum = utils.dict_checksum(
             is_base=False, name=container["name"],
-            song_count=container["songCount"])
+            song_count=container["songCount"], changed=container["changed"])
 
         # Fetch existing item
         try:
