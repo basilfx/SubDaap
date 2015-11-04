@@ -1,4 +1,4 @@
-Cython
+Cython>=0.23.0
 py-sonic
 configobj
 flask-daapserver>=3.0.0
