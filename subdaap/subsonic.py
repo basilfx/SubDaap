@@ -279,6 +279,14 @@ class SubsonicClient(libsonic.Connection):
         else:
             return super(SubsonicClient, self)._doBinReq(*args, **kwargs)
 
+    def _ts2milli(self, ts):
+        """
+        Workaround for the issue with seconds and milliseconds, see
+        https://github.com/crustymonkey/py-sonic/issues/12.
+        """
+
+        return int(ts)
+
     def walk_index(self):
         """
         Request Subsonic's index and iterate each item.

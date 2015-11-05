@@ -103,11 +103,3 @@ class Connection(object):
         """
 
         return self.subsonic.getCoverArt(remote_id)
-
-    def _ts2milli(self, ts):
-        """
-        Workaround for the issue with seconds and milliseconds, see
-        https://github.com/crustymonkey/py-sonic/issues/12.
-        """
-
-        return int(ts)
