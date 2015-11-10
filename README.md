@@ -1,6 +1,8 @@
 # SubDaap
 DAAP server/proxy for SubSonic: play your favorite tunes from SubSonic in iTunes!
 
+[![Build Status](https://travis-ci.org/basilfx/SubDaap.svg?branch=master)](https://travis-ci.org/basilfx/SubDaap)
+
 The motivation for this application comes from the fact that SubSonic does not ship a DAAP server, and OS X clients for SubSonic lack features, in my opinion. And after all, iTunes is a pretty intuitive and stable player.
 
 ## Features
