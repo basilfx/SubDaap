@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Config file specification
-CONFIG_VERSION = 3
+CONFIG_VERSION = 4
 CONFIG_SPEC = """
 version = integer(min=1, default=%d)
 
@@ -49,6 +49,9 @@ item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
+
+[Advanced]
+open files limit = integer(min=-1, default=-1)
 """ % CONFIG_VERSION
 
 

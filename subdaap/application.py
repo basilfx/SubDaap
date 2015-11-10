@@ -8,6 +8,7 @@ from daapserver import DaapServer
 
 from apscheduler.schedulers.gevent import GeventScheduler
 
+import resource
 import logging
 import random
 import errno
@@ -34,6 +35,7 @@ class Application(object):
 
         # Setup all parts of the application
         self.setup_config()
+        self.setup_open_files()
         self.setup_database()
         self.setup_state()
         self.setup_connections()
@@ -49,6 +51,28 @@ class Application(object):
 
         logger.debug("Loading config from %s", self.config_file)
         self.config = config.get_config(self.config_file)
+
+    def setup_open_files(self):
+        """
+        Get and set open files limit.
+        """
+
+        open_files_limit = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+        new_open_files_limit = self.config["Advanced"]["open files limit"]
+
+        logger.info(
+            "System reports open files limit is %d.", open_files_limit)
+
+        if new_open_files_limit != -1:
+            logger.info(
+                "Changing open files limit to %d.", new_open_files_limit)
+
+            try:
+                resource.setrlimit(resource.RLIMIT_NOFILE, (
+                    new_open_files_limit, resource.RLIM_INFINITY))
+            except resource.error as e:
+                logger.warning(
+                    "Failed to increase the number of open files: %s", e)
 
     def setup_database(self):
         """

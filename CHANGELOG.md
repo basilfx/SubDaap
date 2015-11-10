@@ -4,8 +4,9 @@
 Released XX November 2015
 
 Highlights:
-* Fixed: workaround for SubSonic synchronization (see https://github.com/crustymonkey/py-sonic/issues/12)
-* Improved: playlist synchronization (requires SubSonic 5.3)
+* Added: change the soft limit on number of open files.
+* Fixed: workaround for SubSonic synchronization (see https://github.com/crustymonkey/py-sonic/issues/12).
+* Improved: playlist synchronization (requires SubSonic 5.3).
 
 The full list of commits can be found [here](https://github.com/basilfx/SubDaap/compare/v2.0.1...v2.1.0).
 

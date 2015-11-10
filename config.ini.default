@@ -1,5 +1,5 @@
 # Paths and files are relative to the data directory!
-version = 3
+version = 4
 
 [Connections]
 
@@ -98,3 +98,10 @@ item cache size = 10240
 # Percentage of cache size to clean while pruning (default is 0.25). Higher
 # values will make more space, but may remove too much
 # item cache prune threshold = 0.25
+
+
+[Advanced]
+
+# Tweak the number of open files if possible (default is do nothing). This
+# setting heavily depends on the system configuration!
+# open files limit = 256
