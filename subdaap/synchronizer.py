@@ -238,9 +238,9 @@ class Synchronizer(object):
     def sync_versions(self):
         """
         Read the remote index and playlists. Return their versions, so it can
-        be decided if synchronization is required.
-        For the index, a `lastModified` property is available in SubSonic's
-        responses. A similar property exists for playlists since SubSonic 5.3.
+        be decided if synchronization is required. For the index, a
+        `lastModified` property is available in SubSonic's responses. A similar
+        property exists for playlists since SubSonic 5.3.
         """
 
         state = self.state["synchronizers"][self.index]
@@ -248,9 +248,10 @@ class Synchronizer(object):
         items_version = 0
         containers_version = 0
 
-        # Items version (last modified property)
+        # Items version (last modified property). The ifModifiedSince property
+        # is in milliseconds.
         response = self.subsonic.getIndexes(
-            ifModifiedSince=state["items_version"])
+            ifModifiedSince=state["items_version"] or 0)
 
         if "lastModified" in response["indexes"]:
             items_version = response["indexes"]["lastModified"]
