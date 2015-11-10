@@ -203,20 +203,25 @@ class FileCache(object):
 
         with self.items_lock:
             for cache_key, cache_item in self.items.iteritems():
-                if cache_item.uses == 0:
-                    # Check if it is getting ready, e.g. one greenlet is
-                    # downloading the file.
-                    if cache_item.ready and not cache_item.ready.is_set():
-                        continue
+                if cache_item.uses > 0:
+                    logger.debug(
+                        "%s: skipping file with key '%s' because it is %d "
+                        "times in use.", self.name, cache_key, cache_item.uses)
+                    continue
 
-                    # Item was ready and not in use, therefore clear the ready
-                    # flag so no one will use it.
-                    if cache_item.ready:
-                        cache_item.ready.clear()
+                # Check if it is getting ready, e.g. one greenlet is
+                # downloading the file.
+                if cache_item.ready and not cache_item.ready.is_set():
+                    continue
 
-                        # Only unload items that have been ready.
-                        assert cache_item.iterator is not None
-                        candidates.append((cache_key, cache_item))
+                # Item was ready and not in use, therefore clear the ready
+                # flag so no one will use it.
+                if cache_item.ready:
+                    cache_item.ready.clear()
+
+                    # Only unload items that have been ready.
+                    assert cache_item.iterator is not None
+                    candidates.append((cache_key, cache_item))
 
         for cache_key, cache_item in candidates:
             self.unload(cache_key, cache_item)
