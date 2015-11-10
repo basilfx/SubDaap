@@ -5,7 +5,7 @@ import gevent
 import gevent.queue
 
 
-def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
+def stream_from_remote(lock, remote_fd, target_file, chunk_size=32768,
                        on_cache=None):
     """
     Spawn a greenlet to download and cache a file, while simultaniously stream
@@ -74,6 +74,10 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
         with lock:
             try:
                 for chunk_begin, chunk_end, chunk in _downloader():
+                    # Ensure that the chunk we have downloaded is a chunk that
+                    # we are interested in. For instance, we may need the
+                    # middle part of a song, but this will mean that we the
+                    # beginning should be downloaded (and saved to file) first.
                     if (chunk_begin <= begin < chunk_end) or \
                             (chunk_begin <= end < chunk_end):
                         put = not put
@@ -90,12 +94,15 @@ def stream_from_remote(lock, remote_fd, target_file, chunk_size=8192,
     def _streamer(byte_range=None):
         begin, end = parse_byte_range(byte_range)
 
-        # Spawn the download greenlet
+        # Spawn the download greenlet.
         greenlet = gevent.spawn(_cacher, begin, end)
 
         try:
             put = False
 
+            # At this point, the '_cacher' greenlet is already running and
+            # should have downloaded (part of) the file. The part that we are
+            # interested in will be put in the queue.
             for chunk_begin, chunk_end, chunk in queue:
                 if (chunk_begin <= begin < chunk_end) or \
                         (chunk_begin <= end < chunk_end):
@@ -137,7 +144,7 @@ def stream_from_file(lock, fd, file_size, on_start=None, on_finish=None):
     return _streamer
 
 
-def stream_from_buffer(lock, data, file_size, chunk_size=8192, on_start=None,
+def stream_from_buffer(lock, data, file_size, chunk_size=32768, on_start=None,
                        on_finish=None):
     """
     """
