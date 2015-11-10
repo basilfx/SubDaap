@@ -3,12 +3,12 @@ version = 3
 
 [Connections]
 
-# You can define multiple SubSonic connections here. Each connection will be
+# You can define multiple Subsonic connections here. Each connection will be
 # considered as a separate database. Although the DAAP protocol supports
 # multiple databases, iTunes only supports one library. The name of the key
 # defines it's name. The order is important, so don't move sections around!
 
-[[ My SubSonic Library ]]
+[[ My Subsonic Library ]]
 
 # Remote server host (e.g. http://host:port/)
 url = TODO
@@ -28,7 +28,8 @@ password = TODO
 # synchronization interval = 300
 
 # Enable transcode (default is no). Valid choices are 'no', 'unsupported' or
-# 'all'.
+# 'all'. If 'unsupported', only files that are not supported (see below) will
+# be transcoded. Note that transcoding is done by Subsonic!
 # transcode = unsupported
 
 # List of unsupported file suffixes (default is 'flac'). In case of no items or
