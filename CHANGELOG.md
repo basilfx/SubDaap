@@ -1,7 +1,7 @@
 # Changelog
 
 ## v2.1.0
-Released XX November 2015
+Released 18 November 2015
 
 Highlights:
 * Added: change the soft limit on number of open files.
