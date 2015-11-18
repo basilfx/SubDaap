@@ -1,5 +1,5 @@
 Cython>=0.23.0
 py-sonic
 configobj
-flask-daapserver>=3.0.0
+flask-daapserver>=3.0.2
 apscheduler>=3.0.0
