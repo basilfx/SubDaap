@@ -413,8 +413,8 @@ class Synchronizer(object):
                 "updated" in self.synthetic_artists_by_name[item["artist"]]
 
         def is_album_processed(album):
-            return album["artistId"] in self.albums_by_remote_id and  \
-                "updated" in self.albums_by_remote_id[album["artistId"]]
+            return album["id"] in self.albums_by_remote_id and  \
+                "updated" in self.albums_by_remote_id[album["id"]]
 
         def removed_ids(items):
             for value in items.itervalues():
@@ -474,13 +474,17 @@ class Synchronizer(object):
             if "artistId" in item:
                 if not is_artist_processed(item):
                     self.sync_artist(item)
-
-                    for album in self.subsonic.walk_artist(item["artistId"]):
-                        if not is_album_processed(album):
-                            self.sync_album(album)
             elif "artist" in item:
                 if not is_synthetic_artist_processed(item):
                     self.sync_synthetic_artist(item)
+
+            album = self.subsonic.getAlbum(item["albumId"]).get('album', None)
+            if album and not is_album_processed(album):
+                if "artistId" in album:
+                    if not is_artist_processed(album):
+                        self.sync_artist(album)
+
+                self.sync_album(album)
 
             self.sync_item(item)
             self.sync_base_container_item(item)
