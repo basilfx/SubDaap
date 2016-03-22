@@ -413,6 +413,7 @@ class Synchronizer(object):
                 "updated" in self.synthetic_artists_by_name[item["artist"]]
 
         def is_album_processed(album_id):
+            # Album id in the cache is a string, make sure the type matches...
             return album_id in self.albums_by_remote_id and  \
                 "updated" in self.albums_by_remote_id[album_id]
 
@@ -478,11 +479,14 @@ class Synchronizer(object):
                 if not is_synthetic_artist_processed(item):
                     self.sync_synthetic_artist(item)
 
-            if not is_album_processed(item["albumId"]):
+            if "albumId" in item and not is_album_processed(item["albumId"]):
+                # Load the album. Remove all songs from album since they would
+                # change the checksum often, (e.g. playcount)
                 album = self.subsonic.getAlbum(item["albumId"]).get('album')
-                if "artistId" in album:
-                    if not is_artist_processed(album):
-                        self.sync_artist(album)
+                album.pop('song', None)
+
+                if not is_artist_processed(album):
+                    self.sync_artist(album)
 
                 self.sync_album(album)
 
@@ -527,6 +531,8 @@ class Synchronizer(object):
     def sync_item(self, item):
         """
         """
+        
+        logger.debug("[Item:%s] %s", item['id'], item['title'])
 
         def find_artist_by_id(artist_id):
             for artist in self.artists_by_remote_id.itervalues():
@@ -692,6 +698,8 @@ class Synchronizer(object):
         """
         """
 
+        logger.debug("[Artist:%s] %s", item['artistId'], item['artist'])
+
         checksum = utils.dict_checksum(name=item["artist"])
 
         # Fetch existing item
@@ -803,6 +811,8 @@ class Synchronizer(object):
         """
         """
 
+        logger.debug("[Album:%s] %s", album['id'], album['name'])
+
         checksum = utils.dict_checksum(album)
         artist_row = self.artists_by_remote_id.get(album.get("artistId"))
 
@@ -847,7 +857,7 @@ class Synchronizer(object):
                 WHERE
                     `albums`.`id` = ?
                 """,
-                album["artist"],
+                album["name"],
                 "coverArt" in album,
                 checksum,
                 album_id)
@@ -856,7 +866,7 @@ class Synchronizer(object):
             album_id = row["id"]
 
         # Update cache
-        self.albums_by_remote_id[album["id"]] = {
+        self.albums_by_remote_id[int(album["id"])] = {
             "remote_id": album["id"],
             "id": album_id,
             "artist_id": artist_row["id"],

@@ -203,7 +203,7 @@ class Cursor(sqlite3.Cursor):
         result = dict()
 
         for row in self.execute(query, args):
-            result[row[0]] = dict(row)
+            result[int(row[0])] = dict(row)
 
         return result
 
