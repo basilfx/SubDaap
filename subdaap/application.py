@@ -228,7 +228,7 @@ class Application(object):
                     count += 1
             elif synchronization == "startup":
                 if connection.synchronization == "startup":
-                    if not connection.is_initial_synced:
+                    if not connection.synchronizer.is_initial_synced:
                         connection.synchronizer.synchronize()
                         count += 1
             elif synchronization == "manual":
