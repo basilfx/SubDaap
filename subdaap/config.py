@@ -49,6 +49,7 @@ item cache = boolean(default=True)
 item cache dir = string(default="./items")
 item cache size = integer(min=0, default=0)
 item cache prune threshold = float(min=0, max=1.0, default=0.25)
+item cache prune interval = integer(min=1, default=5)
 
 [Advanced]
 open files limit = integer(min=-1, default=-1)

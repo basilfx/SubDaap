@@ -99,6 +99,10 @@ item cache size = 10240
 # values will make more space, but may remove too much
 # item cache prune threshold = 0.25
 
+# How often should expired items be searched and pruned (in minutes)?
+# Default: 5 minutes.
+# item cache prune interval = 300
+
 
 [Advanced]
 
