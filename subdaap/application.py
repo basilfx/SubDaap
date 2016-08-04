@@ -196,12 +196,14 @@ class Application(object):
             _job, max_instances=1, trigger="interval", seconds=1)
 
         # Scheduler task to clean and expire the cache.
+        cache_interval = self.config['Provider']['item cache prune interval']
+
         self.scheduler.add_job(
             self.cache_manager.expire,
-            max_instances=1, trigger="interval", minutes=5)
+            max_instances=1, trigger="interval", minutes=cache_interval)
         self.scheduler.add_job(
             self.cache_manager.clean,
-            max_instances=1, trigger="interval", minutes=30)
+            max_instances=1, trigger="interval", minutes=cache_interval)
 
         # Schedule tasks to synchronize each connection.
         for connection in self.connections.itervalues():
